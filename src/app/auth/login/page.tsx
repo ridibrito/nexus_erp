@@ -8,8 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -17,28 +16,28 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        toast.error('Erro ao fazer login: ' + error.message)
-        return
-      }
-
-      if (data.user) {
-        toast.success('Login realizado com sucesso!')
-        router.push('/')
+      console.log('🔐 Tentando fazer login...')
+      const result = await signIn(email, password)
+      
+      console.log('📊 Resultado do login:', result)
+      
+      if (result.success) {
+        console.log('✅ Login bem-sucedido, redirecionando...')
+        // Redirecionamento direto
+        window.location.href = '/dashboard'
+      } else {
+        console.log('❌ Erro no login:', result.error)
+        // O erro já foi mostrado pelo toast no contexto
       }
     } catch (error) {
-      toast.error('Erro inesperado ao fazer login')
+      console.error('❌ Erro inesperado:', error)
     } finally {
       setIsLoading(false)
     }

@@ -24,36 +24,67 @@ export function AvatarUpload({ onUpload, className = '' }: AvatarUploadProps) {
 
       const fileExt = file.name.split('.').pop()
       const fileName = `${user?.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
+      const filePath = `${user?.id}/${fileName}`
 
+      console.log('📤 Iniciando upload do avatar...')
+      console.log('📁 Caminho do arquivo:', filePath)
+      console.log('👤 ID do usuário:', user?.id)
+
+      // Remover avatar anterior se existir
+      const currentAvatar = getCurrentAvatar()
+      if (currentAvatar) {
+        try {
+          console.log('🗑️ Removendo avatar anterior...')
+          const currentPath = currentAvatar.split('/').pop()
+          if (currentPath && user?.id) {
+            await supabase.storage
+              .from('avatars')
+              .remove([`${user.id}/${currentPath}`])
+            console.log('✅ Avatar anterior removido')
+          }
+        } catch (error) {
+          console.log('⚠️ Erro ao remover avatar anterior:', error)
+        }
+      }
+
+      console.log('⬆️ Fazendo upload do novo avatar...')
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
 
       if (uploadError) {
+        console.error('❌ Erro no upload:', uploadError)
         throw uploadError
       }
 
+      console.log('✅ Upload concluído, obtendo URL pública...')
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath)
 
+      console.log('🔗 URL pública:', publicUrl)
       setAvatarUrl(publicUrl)
       
+      console.log('👤 Atualizando metadata do usuário...')
       // Atualizar o avatar do usuário no Supabase Auth
       const { error: updateError } = await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       })
 
       if (updateError) {
+        console.error('❌ Erro ao atualizar usuário:', updateError)
         throw updateError
       }
 
+      console.log('✅ Avatar atualizado com sucesso!')
       onUpload?.(publicUrl)
       toast.success('Avatar atualizado com sucesso!')
     } catch (error) {
-      console.error('Erro ao fazer upload:', error)
-      toast.error('Erro ao fazer upload do avatar')
+      console.error('❌ Erro ao fazer upload:', error)
+      toast.error('Erro ao fazer upload do avatar: ' + (error as Error).message)
     } finally {
       setUploading(false)
     }
@@ -83,12 +114,13 @@ export function AvatarUpload({ onUpload, className = '' }: AvatarUploadProps) {
       setUploading(true)
 
       // Remover avatar do storage
-      if (avatarUrl) {
-        const filePath = avatarUrl.split('/').pop()
-        if (filePath) {
+      const currentAvatar = getCurrentAvatar()
+      if (currentAvatar) {
+        const filePath = currentAvatar.split('/').pop()
+        if (filePath && user?.id) {
           await supabase.storage
             .from('avatars')
-            .remove([`avatars/${filePath}`])
+            .remove([`${user.id}/${filePath}`])
         }
       }
 

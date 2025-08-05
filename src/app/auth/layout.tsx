@@ -8,7 +8,9 @@ export default function AuthLayout({
 }) {
   return (
     <AuthProvider>
-      {children}
+      <div className="min-h-screen bg-gray-50">
+        {children}
+      </div>
       <Toaster
         position="top-right"
         toastOptions={{

@@ -6,9 +6,12 @@ import Link from 'next/link'
 import { Eye, EyeOff, Loader2, User, Building2, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MaskedInput } from '@/components/ui/masked-input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAuth } from '@/contexts/auth-context'
 import { supabase } from '@/lib/supabase'
+import { maskCNPJ, validateCNPJ, removeMask } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export default function RegisterPage() {
@@ -24,12 +27,15 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { signUp } = useAuth()
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
   const validateForm = () => {
+    console.log('🔍 Validando formulário...', formData)
+    
     if (formData.password !== formData.confirmPassword) {
       toast.error('As senhas não coincidem')
       return false
@@ -42,100 +48,65 @@ export default function RegisterPage() {
       toast.error('Preencha todos os campos obrigatórios')
       return false
     }
+    
+    // Validar CNPJ se foi preenchido
+    if (formData.cnpj && formData.cnpj.replace(/\D/g, '').length > 0) {
+      if (!validateCNPJ(formData.cnpj)) {
+        toast.error('CNPJ inválido')
+        return false
+      }
+    }
+    
+    console.log('✅ Validação passou')
     return true
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('🚀 Iniciando processo de cadastro...')
     
-    if (!validateForm()) return
+    const validationError = validateForm()
+    if (!validationError) {
+      console.log('❌ Validação falhou')
+      return
+    }
     
     setIsLoading(true)
+    console.log('📝 Dados do formulário:', formData)
 
     try {
-      console.log('🚀 Iniciando processo de cadastro...')
-      console.log('📧 Email:', formData.email)
-      console.log('🏢 Empresa:', formData.companyName)
-
-      // Testar conexão primeiro
-      console.log('🔍 Testando conexão com Supabase...')
-      const { data: testData, error: testError } = await supabase
-        .from('empresas')
-        .select('count')
-        .limit(1)
-
-      if (testError) {
-        console.error('❌ Erro na conexão:', testError)
-        toast.error('Erro de conexão com o banco de dados: ' + testError.message)
-        return
-      }
-      console.log('✅ Conexão com Supabase OK')
-
+      console.log('👤 Criando usuário no Supabase Auth...')
+      
       // Criar usuário no Supabase Auth
-      console.log('👤 Criando usuário no Auth...')
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-            company_name: formData.companyName,
-            cnpj: formData.cnpj
-          }
-        }
+      const result = await signUp(formData.email, formData.password, {
+        name: formData.name,
+        company_name: formData.companyName,
+        cnpj: formData.cnpj ? removeMask(formData.cnpj) : null
       })
 
-      if (authError) {
-        console.error('❌ Erro no auth:', authError)
-        toast.error('Erro ao criar conta: ' + authError.message)
-        return
-      }
+      console.log('📊 Resultado do signUp:', result)
 
-      if (authData.user) {
-        console.log('✅ Usuário criado com sucesso:', authData.user.id)
+      if (result.success) {
+        console.log('✅ Usuário criado com sucesso, criando empresa...')
         
         // Aguardar um pouco para garantir que o usuário foi criado
-        console.log('⏳ Aguardando criação do usuário...')
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        // Criar empresa no banco de dados
-        console.log('🏢 Criando empresa no banco...')
-        const { data: empresaData, error: empresaError } = await supabase
-          .from('empresas')
-          .insert({
-            user_id: authData.user.id,
-            razao_social: formData.companyName,
-            cnpj: formData.cnpj || null
-          })
-          .select()
-          .single()
-
-        if (empresaError) {
-          console.error('❌ Erro ao criar empresa:', empresaError)
-          toast.error('Erro ao criar empresa: ' + empresaError.message)
-          
-          // Se falhou ao criar empresa, tentar deletar o usuário criado
-          try {
-            console.log('🔄 Tentando limpar usuário criado...')
-            // Nota: Não podemos deletar usuário com a chave anon, mas podemos marcar como erro
-            toast.error('Usuário criado mas empresa não foi salva. Entre em contato com o suporte.')
-          } catch (deleteError) {
-            console.error('❌ Erro ao deletar usuário:', deleteError)
-          }
-          return
-        }
-
-        console.log('✅ Empresa criada com sucesso:', empresaData)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // O perfil será criado automaticamente pelo trigger
+        console.log('✅ Usuário criado com sucesso, perfil será criado automaticamente')
+        
+        console.log('🎉 Cadastro concluído, redirecionando...')
         toast.success('Conta criada com sucesso! Verifique seu e-mail para confirmar.')
         router.push('/auth/login')
       } else {
-        console.error('❌ Nenhum usuário retornado do auth')
-        toast.error('Erro: Nenhum usuário foi criado')
+        console.error('❌ Erro no signUp:', result.error)
+        toast.error(result.error || 'Erro ao criar conta')
       }
     } catch (error) {
       console.error('❌ Erro inesperado:', error)
-      toast.error('Erro inesperado ao criar conta: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
+      toast.error('Erro inesperado ao criar conta')
     } finally {
+      console.log('🏁 Finalizando processo de cadastro')
       setIsLoading(false)
     }
   }
@@ -217,14 +188,19 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="cnpj">CNPJ (opcional)</Label>
-                <Input
+                <MaskedInput
                   id="cnpj"
                   type="text"
                   placeholder="00.000.000/0000-00"
                   value={formData.cnpj}
-                  onChange={(e) => handleInputChange('cnpj', e.target.value)}
+                  onValueChange={(value) => handleInputChange('cnpj', value)}
+                  mask={maskCNPJ}
                   disabled={isLoading}
+                  maxLength={18}
                 />
+                {formData.cnpj && formData.cnpj.replace(/\D/g, '').length > 0 && !validateCNPJ(formData.cnpj) && (
+                  <p className="text-sm text-red-600">CNPJ inválido</p>
+                )}
               </div>
 
               <div className="space-y-2">

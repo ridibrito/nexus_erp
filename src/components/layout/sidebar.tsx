@@ -12,33 +12,96 @@ import {
   Settings,
   BarChart3,
   CreditCard,
-  Building2,
-  HelpCircle,
-  ChevronDown,
+  Plus,
+  UserPlus,
   DollarSign,
-  TrendingUp,
+  Target,
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  Building2,
+  FolderOpen,
+  Folder,
   Calendar,
-  Shield,
-  User
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+import { NovaCobrancaModal } from '@/components/modals/nova-cobranca-modal'
+import { NovoClienteModal } from '@/components/modals/novo-cliente-modal'
+import { NovaDespesaModal } from '@/components/modals/nova-despesa-modal'
 
+// Estrutura de navegação seguindo a jornada lógica do usuário
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Cobranças', href: '/cobrancas', icon: Receipt },
-  { name: 'Clientes', href: '/clientes', icon: Users },
-  { name: 'NFS-e', href: '/nfs-e', icon: FileText },
-  { name: 'Despesas', href: '/despesas', icon: Calculator },
-  { name: 'Relatórios', href: '/relatorios', icon: BarChart3 },
-  { name: 'Pagamentos', href: '/pagamentos', icon: CreditCard },
-  { name: 'Empresa', href: '/configuracoes/empresa', icon: Building2 },
-  { name: 'Configurações', href: '/configuracoes', icon: Settings },
+  {
+    name: 'Dashboard',
+    href: '/',
+    icon: LayoutDashboard,
+    type: 'single'
+  },
+  {
+    name: 'Gestão de Negócios',
+    icon: Building2,
+    type: 'group',
+    items: [
+      { name: 'Clientes', href: '/clientes', icon: Users },
+      { name: 'Negócios', href: '/negocios', icon: Target },
+      { name: 'Contratos', href: '/contratos', icon: FileText },
+      { name: 'Projetos', href: '/projetos', icon: Briefcase },
+    ]
+  },
+  {
+    name: 'Financeiro',
+    icon: DollarSign,
+    type: 'group',
+    items: [
+      { name: 'Contas a Pagar', href: '/contas-pagar', icon: TrendingDown },
+      { name: 'Contas a Receber', href: '/contas-receber', icon: TrendingUp },
+      { name: 'Movimentações Bancárias', href: '/movimentacoes-bancarias', icon: BarChart3 },
+    ]
+  },
+  {
+    name: 'Relatórios',
+    icon: BarChart3,
+    type: 'group',
+    items: [
+      { name: 'DRE', href: '/relatorios/dre', icon: BarChart3 },
+      { name: 'Fluxo de Caixa', href: '/relatorios/fluxo-caixa', icon: DollarSign },
+      { name: 'Vendas por Serviço', href: '/relatorios/vendas-servicos', icon: Target },
+      { name: 'Lucratividade por Projeto', href: '/relatorios/lucratividade-projetos', icon: Briefcase },
+    ]
+  }
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [showNovaCobranca, setShowNovaCobranca] = useState(false)
+  const [showNovoCliente, setShowNovoCliente] = useState(false)
+  const [showNovaDespesa, setShowNovaDespesa] = useState(false)
+  
+  // Se estiver no dashboard, não abre nenhum menu por padrão
+  const isDashboard = pathname === '/' || pathname === '/dashboard'
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(isDashboard ? [] : ['Gestão de Negócios'])
+
+  const toggleMenu = (menuName: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(menuName) 
+        ? [] // Fecha o menu se já estiver aberto
+        : [menuName] // Abre apenas este menu, fechando os outros
+    )
+  }
+
+  const isMenuExpanded = (menuName: string) => expandedMenus.includes(menuName)
+
+  const isActive = (href: string) => pathname === href
+
+  const isAnyChildActive = (items: any[]) => {
+    return items.some(item => isActive(item.href))
+  }
+
   return (
     <div className="flex flex-col w-64 bg-gray-800 text-white">
+      {/* Logo Simples */}
       <div className="flex items-center h-16 px-6 border-b border-gray-700">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -47,54 +110,149 @@ export function Sidebar() {
           <span className="font-semibold text-lg text-white">Nexus ERP</span>
         </div>
       </div>
+
+      {/* Menu de Acesso Rápido */}
       <div className="px-4 py-4 border-b border-gray-700">
-        <Button variant="ghost" className="w-full justify-between text-gray-300 hover:text-white hover:bg-gray-700">
-          <div className="flex items-center space-x-2">
-            <Building2 className="h-4 w-4" />
-            <span className="text-sm">Empresa Atual</span>
-          </div>
-          <ChevronDown className="h-4 w-4" />
-        </Button>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Acesso Rápido
+        </h3>
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => setShowNovoCliente(true)}
+            className="flex items-center justify-center p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors group relative"
+            title="Novo Cliente"
+          >
+            <UserPlus className="h-5 w-5 text-green-400" />
+            <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+              Novo Cliente
+            </span>
+          </button>
+          <button
+            onClick={() => setShowNovaCobranca(true)}
+            className="flex items-center justify-center p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors group relative"
+            title="Nova Conta a Receber"
+          >
+            <Plus className="h-5 w-5 text-blue-400" />
+            <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+              Nova Conta a Receber
+            </span>
+          </button>
+          <button
+            onClick={() => setShowNovaDespesa(true)}
+            className="flex items-center justify-center p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors group relative"
+            title="Nova Conta a Pagar"
+          >
+            <DollarSign className="h-5 w-5 text-red-400" />
+            <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+              Nova Conta a Pagar
+            </span>
+          </button>
+        </div>
       </div>
-      <nav className="flex-1 px-4 py-6 space-y-2">
+
+      {/* Navegação Principal */}
+      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                'sidebar-item',
-                isActive
-                  ? 'sidebar-item-active'
-                  : 'sidebar-item-inactive'
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              <span>{item.name}</span>
-            </Link>
-          )
+          if (item.type === 'single') {
+            return (
+              <Link
+                key={item.name}
+                href={item.href || '#'}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  isActive(item.href || '')
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.name}</span>
+              </Link>
+            )
+          }
+
+          if (item.type === 'group' && item.items) {
+            const hasActiveChild = isAnyChildActive(item.items)
+            const isExpanded = isMenuExpanded(item.name)
+
+            return (
+              <div key={item.name} className="space-y-1">
+                <button
+                  onClick={() => toggleMenu(item.name)}
+                  className={cn(
+                    'flex items-center justify-between w-full px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                    hasActiveChild
+                      ? 'bg-gray-700 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-700'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                
+                {isExpanded && (
+                  <div className="ml-6 space-y-1">
+                    {item.items.map((subItem) => (
+                      <Link
+                        key={subItem.name}
+                        href={subItem.href}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                          isActive(subItem.href)
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                        )}
+                      >
+                        <subItem.icon className="h-4 w-4" />
+                        <span>{subItem.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          return null
         })}
       </nav>
-      <div className="p-4 border-t border-gray-700 space-y-2">
+
+      {/* Configurações */}
+      <div className="p-4 border-t border-gray-700">
         <Link
-          href="/perfil"
+          href="/configuracoes"
           className={cn(
-            'sidebar-item',
-            pathname === '/perfil' ? 'sidebar-item-active' : 'sidebar-item-inactive'
+            'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+            pathname === '/configuracoes' 
+              ? 'bg-blue-600 text-white' 
+              : 'text-gray-300 hover:text-white hover:bg-gray-700'
           )}
         >
-          <User className="h-4 w-4" />
-          <span>Meu Perfil</span>
-        </Link>
-        <Link
-          href="/ajuda"
-          className="sidebar-item sidebar-item-inactive"
-        >
-          <HelpCircle className="h-4 w-4" />
-          <span>Ajuda</span>
+          <Settings className="h-4 w-4" />
+          <span>Configurações</span>
         </Link>
       </div>
+
+      {/* Modais */}
+      <NovaCobrancaModal 
+        isOpen={showNovaCobranca} 
+        onClose={() => setShowNovaCobranca(false)} 
+      />
+      <NovoClienteModal 
+        isOpen={showNovoCliente} 
+        onClose={() => setShowNovoCliente(false)} 
+      />
+      <NovaDespesaModal 
+        isOpen={showNovaDespesa} 
+        onClose={() => setShowNovaDespesa(false)} 
+      />
     </div>
   )
 } 

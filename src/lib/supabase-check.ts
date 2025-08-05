@@ -1,145 +1,103 @@
-import { supabase } from './supabase'
+import { supabase, testSupabaseConnection } from './supabase'
 
-export async function checkSupabaseConnection() {
-  try {
-    // Testar conexão básica
-    const { data, error } = await supabase
-      .from('empresas')
-      .select('count')
-      .limit(1)
-
-    if (error) {
-      console.error('Erro na conexão com Supabase:', error)
-      return {
-        success: false,
-        error: error.message,
-        details: 'Falha na conexão básica com o banco de dados'
-      }
-    }
-
-    // Testar se as tabelas existem
-    const tables = ['empresas', 'clientes', 'cobrancas', 'contas_a_pagar', 'integracoes']
-    const tableChecks = await Promise.all(
-      tables.map(async (table) => {
-        const { error } = await supabase
-          .from(table)
-          .select('*')
-          .limit(1)
-        
-        return {
-          table,
-          exists: !error,
-          error: error?.message
-        }
-      })
-    )
-
-    const missingTables = tableChecks.filter(check => !check.exists)
-    
-    if (missingTables.length > 0) {
-      return {
-        success: false,
-        error: 'Tabelas não encontradas',
-        details: `Tabelas ausentes: ${missingTables.map(t => t.table).join(', ')}`,
-        missingTables
-      }
-    }
-
-    // Testar autenticação
-    const { data: authData, error: authError } = await supabase.auth.getSession()
-    
-    if (authError) {
-      console.error('Erro na autenticação:', authError)
-      return {
-        success: false,
-        error: 'Erro na configuração de autenticação',
-        details: authError.message
-      }
-    }
-
-    return {
-      success: true,
-      message: 'Supabase configurado corretamente',
-      tables: tableChecks.map(check => ({ table: check.table, exists: check.exists })),
-      auth: authData.session ? 'Usuário autenticado' : 'Usuário não autenticado'
-    }
-
-  } catch (error) {
-    console.error('Erro inesperado:', error)
-    return {
-      success: false,
-      error: 'Erro inesperado',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }
+export async function checkSupabaseSetup() {
+  console.log('🔍 Verificando configuração do Supabase...')
+  
+  // Verificar variáveis de ambiente
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  
+  if (!supabaseUrl) {
+    console.error('❌ NEXT_PUBLIC_SUPABASE_URL não está definida')
+    return false
+  }
+  
+  if (!supabaseAnonKey) {
+    console.error('❌ NEXT_PUBLIC_SUPABASE_ANON_KEY não está definida')
+    return false
+  }
+  
+  console.log('✅ Variáveis de ambiente configuradas')
+  
+  // Testar conexão
+  const isConnected = await testSupabaseConnection()
+  
+  if (isConnected) {
+    console.log('✅ Conexão com Supabase estabelecida')
+    return true
+  } else {
+    console.error('❌ Falha na conexão com Supabase')
+    return false
   }
 }
 
-export async function testDatabaseOperations() {
+export async function testDatabaseTables() {
   try {
-    // Primeiro, verificar se o usuário está autenticado
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    console.log('🔍 Testando tabelas do banco de dados...')
     
-    if (sessionError) {
-      return {
-        success: false,
-        error: 'Erro ao verificar sessão',
-        details: sessionError.message
-      }
-    }
-
-    if (!session) {
-      return {
-        success: true,
-        message: 'RLS está funcionando corretamente',
-        details: 'Usuário não autenticado - inserção bloqueada por RLS (comportamento esperado)'
-      }
-    }
-
-    // Se o usuário está autenticado, testar inserção real
-    const testData = {
-      user_id: session.user.id,
-      razao_social: 'Teste de Conexão - ' + new Date().toISOString(),
-      cnpj: null
-    }
-
-    const { data: insertData, error: insertError } = await supabase
+    // Testar tabela empresas
+    const { data: empresas, error: empresasError } = await supabase
       .from('empresas')
-      .insert(testData)
-      .select()
-      .single()
-
-    if (insertError) {
-      return {
-        success: false,
-        error: 'Erro ao testar inserção',
-        details: insertError.message
-      }
+      .select('count')
+      .limit(1)
+    
+    if (empresasError) {
+      console.error('❌ Erro ao acessar tabela empresas:', empresasError)
+      return false
     }
-
-    // Se a inserção funcionou, deletar o registro de teste
-    if (insertData) {
-      const { error: deleteError } = await supabase
-        .from('empresas')
-        .delete()
-        .eq('id', insertData.id)
-
-      if (deleteError) {
-        console.warn('Aviso: Não foi possível deletar o registro de teste:', deleteError.message)
-      }
+    
+    console.log('✅ Tabela empresas acessível')
+    
+    // Testar tabela clientes
+    const { data: clientes, error: clientesError } = await supabase
+      .from('clientes')
+      .select('count')
+      .limit(1)
+    
+    if (clientesError) {
+      console.error('❌ Erro ao acessar tabela clientes:', clientesError)
+      return false
     }
-
-    return {
-      success: true,
-      message: 'Operações de banco funcionando corretamente',
-      details: 'Inserção e exclusão de teste realizadas com sucesso'
+    
+    console.log('✅ Tabela clientes acessível')
+    
+    // Testar tabela cobrancas
+    const { data: cobrancas, error: cobrancasError } = await supabase
+      .from('cobrancas')
+      .select('count')
+      .limit(1)
+    
+    if (cobrancasError) {
+      console.error('❌ Erro ao acessar tabela cobrancas:', cobrancasError)
+      return false
     }
-
+    
+    console.log('✅ Tabela cobrancas acessível')
+    
+    console.log('✅ Todas as tabelas estão acessíveis')
+    return true
+    
   } catch (error) {
-    console.error('Erro no teste de operações:', error)
-    return {
-      success: false,
-      error: 'Erro no teste de operações',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    }
+    console.error('❌ Erro inesperado ao testar tabelas:', error)
+    return false
   }
+}
+
+export async function runFullCheck() {
+  console.log('🚀 Iniciando verificação completa do Supabase...')
+  
+  const setupOk = await checkSupabaseSetup()
+  if (!setupOk) {
+    console.error('❌ Configuração do Supabase falhou')
+    return false
+  }
+  
+  const tablesOk = await testDatabaseTables()
+  if (!tablesOk) {
+    console.error('❌ Teste das tabelas falhou')
+    return false
+  }
+  
+  console.log('✅ Verificação completa concluída com sucesso!')
+  return true
 } 

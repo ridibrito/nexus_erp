@@ -7,32 +7,26 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
+  const { resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      })
-
-      if (error) {
-        toast.error('Erro ao enviar e-mail: ' + error.message)
-        return
+      const result = await resetPassword(email)
+      
+      if (result.success) {
+        setEmailSent(true)
       }
-
-      setEmailSent(true)
-      toast.success('E-mail de recuperação enviado!')
     } catch (error) {
-      toast.error('Erro inesperado ao enviar e-mail')
+      console.error('Erro inesperado:', error)
     } finally {
       setIsLoading(false)
     }

@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
+import { useAuth } from '@/contexts/auth-context'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -18,41 +17,34 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
+  const { updatePassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (password !== confirmPassword) {
-      toast.error('As senhas não coincidem')
       return
     }
     
     if (password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres')
       return
     }
 
     setIsLoading(true)
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      })
-
-      if (error) {
-        toast.error('Erro ao redefinir senha: ' + error.message)
-        return
-      }
-
-      setIsSuccess(true)
-      toast.success('Senha redefinida com sucesso!')
+      const result = await updatePassword(password)
       
-      // Redirecionar após 2 segundos
-      setTimeout(() => {
-        router.push('/auth/login')
-      }, 2000)
+      if (result.success) {
+        setIsSuccess(true)
+        
+        // Redirecionar após 2 segundos
+        setTimeout(() => {
+          router.push('/auth/login')
+        }, 2000)
+      }
     } catch (error) {
-      toast.error('Erro inesperado ao redefinir senha')
+      console.error('Erro inesperado:', error)
     } finally {
       setIsLoading(false)
     }
