@@ -1,6 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
-import { Breadcrumb } from '@/components/layout/breadcrumb'
 
 export default function DashboardLayout({
   children,
@@ -12,8 +11,7 @@ export default function DashboardLayout({
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          <Breadcrumb />
+        <main className="flex-1 overflow-y-auto p-4">
           {children}
         </main>
       </div>

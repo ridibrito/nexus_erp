@@ -26,7 +26,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.48.2",
-    "recharts": "^2.8.0",
+    "recharts": "^2.15.4",
     "resend": "^3.1.0",
     "sonner": "^1.2.4",
     "stripe": "^14.10.0",

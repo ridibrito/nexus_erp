@@ -30,6 +30,7 @@ import { useState } from 'react'
 import { NovaCobrancaModal } from '@/components/modals/nova-cobranca-modal'
 import { NovoClienteModal } from '@/components/modals/novo-cliente-modal'
 import { NovaDespesaModal } from '@/components/modals/nova-despesa-modal'
+import { useEffect } from 'react'
 
 // Estrutura de navegação seguindo a jornada lógica do usuário
 const navigation = [
@@ -79,9 +80,14 @@ export function Sidebar() {
   const [showNovoCliente, setShowNovoCliente] = useState(false)
   const [showNovaDespesa, setShowNovaDespesa] = useState(false)
   
-  // Se estiver no dashboard, não abre nenhum menu por padrão
-  const isDashboard = pathname === '/' || pathname === '/dashboard'
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(isDashboard ? [] : ['Gestão de Negócios'])
+  // Todos os menus ficam fechados por padrão
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([])
+
+  // Efeito para controlar o estado dos menus baseado na rota
+  useEffect(() => {
+    // Fecha todos os menus em todas as páginas por padrão
+    setExpandedMenus([])
+  }, [pathname])
 
   const toggleMenu = (menuName: string) => {
     setExpandedMenus(prev => 

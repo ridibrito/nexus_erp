@@ -46,14 +46,15 @@ const configSections = [
     name: 'Cadastros',
     icon: Target,
     items: [
-      { id: 'categorias-servicos', name: 'Categorias de Serviços' },
-      { id: 'servicos', name: 'Serviços' },
-      { id: 'modelos-contrato', name: 'Modelos de Contrato' },
-      { id: 'templates-projeto', name: 'Templates de Projeto' },
-      { id: 'centros-custo', name: 'Centros de Custo' },
-      { id: 'categorias-despesa', name: 'Categorias de Despesa' },
-      { id: 'formas-pagamento', name: 'Formas de Pagamento' },
-      { id: 'condicoes-pagamento', name: 'Condições de Pagamento' },
+      { id: 'categorias-servicos', name: 'Categorias de Serviços', href: '/configuracoes/cadastros/categorias' },
+      { id: 'servicos', name: 'Serviços', href: '/configuracoes/cadastros/servicos' },
+      { id: 'modelos-contrato', name: 'Modelos de Contrato', href: '/configuracoes/cadastros/modelos' },
+      { id: 'templates-projeto', name: 'Templates de Projeto', href: '/configuracoes/cadastros/templates' },
+      { id: 'centros-custo', name: 'Centros de Custo', href: '/configuracoes/cadastros/centros-custo' },
+      { id: 'categorias-despesa', name: 'Categorias de Despesa', href: '/configuracoes/cadastros/categorias-despesa' },
+      { id: 'formas-pagamento', name: 'Formas de Pagamento', href: '/configuracoes/cadastros/formas-pagamento' },
+      { id: 'condicoes-pagamento', name: 'Condições de Pagamento', href: '/configuracoes/cadastros/condicoes-pagamento' },
+      { id: 'pipelines', name: 'Pipelines de Vendas', href: '/configuracoes/cadastros/pipelines' },
     ]
   },
   {
@@ -120,7 +121,7 @@ export default function ConfiguracoesLayout({
   return (
     <div className="flex h-full">
       {/* Sidebar Interno */}
-      <div className="w-64 bg-gray-50 border-r border-gray-200 p-4">
+      <div className="w-80 bg-gray-50 border-r border-gray-200 p-4">
         <div className="mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Configurações</h2>
           <p className="text-sm text-gray-600">Gerencie os dados do sistema</p>
@@ -155,15 +156,15 @@ export default function ConfiguracoesLayout({
                 <p className="text-gray-600 mt-2">Configure as opções de {activeSectionData.name.toLowerCase()}</p>
               </div>
 
-              {/* Tabs */}
+              {/* Tabs com Rolagem Horizontal */}
               <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8">
+                <nav className="-mb-px flex space-x-8 overflow-x-auto pb-2">
                   {activeSectionData.items.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => handleTabClick(item.id)}
                       className={cn(
-                        'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                        'py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap',
                         activeTab === item.id
                           ? 'border-blue-500 text-blue-600'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
