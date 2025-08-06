@@ -37,8 +37,14 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession()
 
   // Rotas que requerem autenticação (dentro do dashboard)
-  const protectedRoutes = ['/', '/cobrancas', '/clientes', '/configuracoes', '/perfil']
+  const protectedRoutes = ['/', '/cobrancas', '/clientes', '/perfil']
   const isProtectedRoute = protectedRoutes.some(route => 
+    req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route + '/')
+  )
+
+  // Rotas que requerem admin (configurações)
+  const adminRoutes = ['/configuracoes']
+  const isAdminRoute = adminRoutes.some(route => 
     req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route + '/')
   )
 
@@ -54,18 +60,41 @@ export async function middleware(req: NextRequest) {
     req.nextUrl.pathname === route || req.nextUrl.pathname.startsWith(route + '/')
   )
 
-  // Desabilitado - usando apenas AuthGuard
   // Se não está autenticado e tentando acessar rota protegida
-  // if (!session && isProtectedRoute) {
-  //   const redirectUrl = new URL('/auth/login', req.url)
-  //   return NextResponse.redirect(redirectUrl)
-  // }
+  if (!session && (isProtectedRoute || isAdminRoute)) {
+    const redirectUrl = new URL('/auth/login', req.url)
+    return NextResponse.redirect(redirectUrl)
+  }
 
   // Se está autenticado e tentando acessar rota de auth
-  // if (session && isAuthRoute) {
-  //   const redirectUrl = new URL('/', req.url)
-  //   return NextResponse.redirect(redirectUrl)
-  // }
+  if (session && isAuthRoute) {
+    const redirectUrl = new URL('/', req.url)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  // Se está autenticado mas tentando acessar rota de admin
+  if (session && isAdminRoute) {
+    try {
+      // Verificar se o usuário é admin
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('role')
+        .eq('auth_user_id', session.user.id)
+        .eq('is_active', true)
+        .single()
+
+      // Se não é admin, redirecionar para dashboard
+      if (!usuario || usuario.role !== 'admin') {
+        const redirectUrl = new URL('/', req.url)
+        return NextResponse.redirect(redirectUrl)
+      }
+    } catch (error) {
+      console.error('Erro ao verificar permissões de admin:', error)
+      // Em caso de erro, redirecionar para dashboard por segurança
+      const redirectUrl = new URL('/', req.url)
+      return NextResponse.redirect(redirectUrl)
+    }
+  }
 
   return response
 }

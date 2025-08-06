@@ -31,6 +31,7 @@ import { NovaCobrancaModal } from '@/components/modals/nova-cobranca-modal'
 import { NovoClienteModal } from '@/components/modals/novo-cliente-modal'
 import { NovaDespesaModal } from '@/components/modals/nova-despesa-modal'
 import { useEffect } from 'react'
+import { useAdmin } from '@/hooks/use-admin'
 
 // Estrutura de navegação seguindo a jornada lógica do usuário
 const navigation = [
@@ -76,6 +77,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { isAdmin, loading } = useAdmin()
   const [showNovaCobranca, setShowNovaCobranca] = useState(false)
   const [showNovoCliente, setShowNovoCliente] = useState(false)
   const [showNovaDespesa, setShowNovaDespesa] = useState(false)
@@ -230,21 +232,23 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Configurações */}
-      <div className="p-4 border-t border-gray-700">
-        <Link
-          href="/configuracoes"
-          className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-            pathname === '/configuracoes' 
-              ? 'bg-blue-600 text-white' 
-              : 'text-gray-300 hover:text-white hover:bg-gray-700'
-          )}
-        >
-          <Settings className="h-4 w-4" />
-          <span>Configurações</span>
-        </Link>
-      </div>
+      {/* Configurações - Apenas para Admins */}
+      {!loading && isAdmin && (
+        <div className="p-4 border-t border-gray-700">
+          <Link
+            href="/configuracoes"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+              pathname === '/configuracoes' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-gray-300 hover:text-white hover:bg-gray-700'
+            )}
+          >
+            <Settings className="h-4 w-4" />
+            <span>Configurações</span>
+          </Link>
+        </div>
+      )}
 
       {/* Modais */}
       <NovaCobrancaModal 
