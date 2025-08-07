@@ -196,7 +196,7 @@ export default function CobrancasPage() {
               </thead>
               <tbody>
                 {cobrancasData.map((cobranca) => {
-                  const StatusIcon = statusIcons[cobranca.status]
+                  const StatusIcon = statusIcons[cobranca.status as keyof typeof statusIcons]
                   return (
                     <tr key={cobranca.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
@@ -216,7 +216,7 @@ export default function CobrancasPage() {
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <Badge className={`${statusColors[cobranca.status]} flex items-center gap-1`}>
+                        <Badge className={`${statusColors[cobranca.status as keyof typeof statusColors]} flex items-center gap-1`}>
                           <StatusIcon className="h-3 w-3" />
                           {cobranca.status === 'pendente' ? 'Pendente' : 
                            cobranca.status === 'pago' ? 'Pago' : 'Vencido'}

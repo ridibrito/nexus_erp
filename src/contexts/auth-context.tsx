@@ -44,15 +44,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         console.log('🔄 Auth state changed:', event, session?.user?.email)
         
-        // Atualizar estado
-        setSession(session)
-        setUser(session?.user ?? null)
+        // Atualizar estado apenas se realmente mudou
+        setSession(prevSession => {
+          if (prevSession?.user?.id !== session?.user?.id) {
+            return session
+          }
+          return prevSession
+        })
+        
+        setUser(prevUser => {
+          if (prevUser?.id !== session?.user?.id) {
+            return session?.user ?? null
+          }
+          return prevUser
+        })
+        
         setLoading(false)
         
-        // Se o usuário acabou de fazer login, redirecionar
-        if (event === 'SIGNED_IN' && session?.user) {
+        // Se o usuário acabou de fazer login, redirecionar apenas se não estiver já na página principal
+        if (event === 'SIGNED_IN' && session?.user && window.location.pathname !== '/') {
           console.log('✅ Usuário logado, redirecionando...')
-          // Usar window.location para garantir redirecionamento
+          // Usar router.push em vez de window.location para evitar recarregamento
           window.location.href = '/'
         }
       }

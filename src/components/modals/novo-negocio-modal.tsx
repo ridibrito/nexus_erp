@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useClientes, usePipelines } from '@/hooks/use-api'
+import { useClientes, usePipelines, useUsuarios } from '@/hooks/use-api'
 import { type Negocio, clientesAPI } from '@/lib/api'
+import { maskCurrency, unmaskCurrency } from '@/lib/utils'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -22,6 +23,7 @@ interface NovoNegocioModalProps {
 export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioModalProps) {
   const { clientes, carregarClientes } = useClientes()
   const { pipelines } = usePipelines()
+  const { usuarios } = useUsuarios()
   
   const [loading, setLoading] = useState(false)
   
@@ -48,25 +50,67 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
     proximo_contato: '',
     data_fechamento: ''
   })
+  
+  // Debug logs
+  console.log('=== DEBUG NOVO NEGÓCIO MODAL ===')
+  console.log('Clientes:', clientes)
+  console.log('Pipelines:', pipelines)
+  console.log('Usuários:', usuarios)
+  console.log('FormData:', formData)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      // Validações
+      if (!formData.titulo.trim()) {
+        toast.error('Título é obrigatório')
+        setLoading(false)
+        return
+      }
+
+      if (!formData.cliente_id) {
+        toast.error('Cliente é obrigatório')
+        setLoading(false)
+        return
+      }
+
+      if (!formData.pipeline_id) {
+        toast.error('Pipeline é obrigatório')
+        setLoading(false)
+        return
+      }
+
+      if (!formData.etapa_id) {
+        toast.error('Etapa é obrigatória')
+        setLoading(false)
+        return
+      }
+
+      console.log('Dados do negócio a ser criado:', {
+        titulo: formData.titulo,
+        descricao: formData.descricao || undefined,
+        cliente_id: formData.cliente_id,
+        pipeline_id: formData.pipeline_id,
+        etapa_id: formData.etapa_id,
+        valor: unmaskCurrency(formData.valor) || 0,
+        probabilidade: parseInt(formData.probabilidade) || 50,
+      })
+
       await onSubmit({
         titulo: formData.titulo,
         descricao: formData.descricao || undefined,
         cliente_id: formData.cliente_id,
         pipeline_id: formData.pipeline_id,
         etapa_id: formData.etapa_id,
-        valor: parseFloat(formData.valor) || 0,
+        valor: unmaskCurrency(formData.valor) || 0,
         probabilidade: parseInt(formData.probabilidade) || 50,
-        prioridade: formData.prioridade as 'baixa' | 'media' | 'alta',
-        responsavel_id: formData.responsavel_id || undefined,
-        proximo_contato: formData.proximo_contato || undefined,
-        data_fechamento: formData.data_fechamento || undefined,
-        status: 'ativo'
+        // prioridade: formData.prioridade as 'baixa' | 'media' | 'alta',
+        // responsavel_id: formData.responsavel_id || undefined,
+        // proximo_contato: formData.proximo_contato || undefined,
+        // data_fechamento: formData.data_fechamento || undefined,
+        // status: 'ativo'
       })
 
       // Reset form
@@ -85,8 +129,10 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
       })
 
       onOpenChange(false)
+      toast.success('Negócio criado com sucesso!')
     } catch (error) {
       console.error('Erro ao criar negócio:', error)
+      toast.error('Erro ao criar negócio. Verifique os dados e tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -135,6 +181,7 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
         cnpj: clienteData.cnpj || undefined,
         email: clienteData.email || undefined,
         telefone: clienteData.telefone || undefined,
+        tipo: 'pessoa_juridica',
         status: 'ativo'
       })
 
@@ -202,13 +249,19 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Selecione um cliente" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {clientes.map((cliente) => (
+                                      <SelectContent>
+                    {clientes.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        Nenhum cliente encontrado
+                      </SelectItem>
+                    ) : (
+                      clientes.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome_fant}
+                          {cliente.nome_fant || cliente.nome || 'Cliente sem nome'}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
+                      ))
+                    )}
+                  </SelectContent>
                   </Select>
                   <Button
                     type="button"
@@ -280,11 +333,13 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                 <Label htmlFor="valor">Valor (R$) *</Label>
                 <Input
                   id="valor"
-                  type="number"
-                  step="0.01"
+                  type="text"
                   value={formData.valor}
-                  onChange={(e) => setFormData(prev => ({ ...prev, valor: e.target.value }))}
-                  placeholder="0,00"
+                  onChange={(e) => {
+                    const maskedValue = maskCurrency(e.target.value)
+                    setFormData(prev => ({ ...prev, valor: maskedValue }))
+                  }}
+                  placeholder="R$ 0,00"
                   required
                 />
               </div>
@@ -329,12 +384,21 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
 
               <div className="space-y-2">
                 <Label htmlFor="responsavel">Responsável</Label>
-                <Input
-                  id="responsavel"
+                <Select
                   value={formData.responsavel_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, responsavel_id: e.target.value }))}
-                  placeholder="Nome do responsável"
-                />
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {usuarios.map((usuario) => (
+                      <SelectItem key={usuario.id} value={usuario.id}>
+                        {usuario.nome || usuario.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

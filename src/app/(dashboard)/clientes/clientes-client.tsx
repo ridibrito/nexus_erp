@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Cliente } from '@/lib/api'
 import { criarCliente, deletarCliente } from '@/lib/actions/clientes'
 import { Button } from '@/components/ui/button'
@@ -55,6 +56,7 @@ interface ClientesClientProps {
 }
 
 export function ClientesClient({ initialData }: ClientesClientProps) {
+  const router = useRouter()
   const [clientes, setClientes] = useState(initialData)
   const [showModal, setShowModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -135,11 +137,6 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
     return tipo === 'pessoa_juridica' 
       ? <Badge variant="outline" className="text-blue-600">Pessoa Jurídica</Badge>
       : <Badge variant="outline" className="text-purple-600">Pessoa Física</Badge>
-  }
-
-  const handleViewCliente = (cliente: Cliente) => {
-    setSelectedCliente(cliente)
-    setShowDetailModal(true)
   }
 
   // Filtrar clientes
@@ -344,7 +341,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleViewCliente(cliente)}>
+                          <DropdownMenuItem onClick={() => router.push(`/clientes/${cliente.id}`)}>
                             <Eye className="h-4 w-4 mr-2" />
                             Visualizar
                           </DropdownMenuItem>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +27,7 @@ import { NovoNegocioModal } from '@/components/modals/novo-negocio-modal'
 import { Negocio } from '@/lib/api'
 
 export default function NegociosPage() {
+  const router = useRouter()
   const { negocios, loading: loadingNegocios, error: errorNegocios, moverNegocio, criarNegocio } = useNegocios()
   const { pipelines, loading: loadingPipelines, error: errorPipelines } = usePipelines()
   const { clientes, loading: loadingClientes } = useClientes()
@@ -341,7 +343,15 @@ export default function NegociosPage() {
                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                               <Mail className="h-3 w-3" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/negocios/${negocio.id}`)
+                              }}
+                            >
                               <Eye className="h-3 w-3" />
                             </Button>
                             <div className="flex-1"></div>

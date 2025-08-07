@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, Search, User, Settings, LogOut, ChevronDown } from 'lucide-react'
+import { Bell, Search, User, Settings, LogOut, ChevronDown, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,10 +14,14 @@ import {
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 export function Header() {
   const { user, signOut } = useAuth()
   const router = useRouter()
+  
+  // Mock data para e-mails não lidos (futuramente virá de um contexto)
+  const unreadCount = 5
 
   const handleSignOut = async () => {
     try {
@@ -64,6 +68,16 @@ export function Header() {
         </div>
       </div>
       <div className="flex items-center space-x-4">
+        <Link href="/email">
+          <Button variant="ghost" size="icon" className="relative">
+            <Mail className="h-5 w-5 text-gray-600" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+          </Button>
+        </Link>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5 text-gray-600" />
           <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full flex items-center justify-center text-xs text-white font-medium">

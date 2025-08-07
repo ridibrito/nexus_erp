@@ -14,8 +14,8 @@ export default function DebugPage() {
     setIsLoading(true)
     try {
       // Importar dinamicamente para evitar erros de SSR
-      const { checkSupabaseConnection } = await import('@/lib/supabase-check')
-      const result = await checkSupabaseConnection()
+      const { checkSupabaseSetup } = await import('@/lib/supabase-check')
+      const result = await checkSupabaseSetup()
       setConnectionResult(result)
     } catch (error) {
       console.error('Erro no teste de conexão:', error)
@@ -33,8 +33,8 @@ export default function DebugPage() {
     setIsLoading(true)
     try {
       // Importar dinamicamente para evitar erros de SSR
-      const { testDatabaseOperations } = await import('@/lib/supabase-check')
-      const result = await testDatabaseOperations()
+      const { testDatabaseTables } = await import('@/lib/supabase-check')
+      const result = await testDatabaseTables()
       setOperationsResult(result)
     } catch (error) {
       console.error('Erro no teste de operações:', error)

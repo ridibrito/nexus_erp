@@ -18,6 +18,7 @@ import {
   type CategoriaFinanceira,
   type FormaPagamento
 } from '@/lib/api'
+import { usuariosAPI, type Usuario } from '@/lib/api/usuarios'
 
 // =====================================================
 // HOOKS PARA CLIENTES
@@ -624,5 +625,66 @@ export function useFormasPagamento() {
     criarFormaPagamento,
     atualizarFormaPagamento,
     deletarFormaPagamento
+  }
+}
+
+// =====================================================
+// HOOKS PARA USUÁRIOS
+// =====================================================
+
+export function useUsuarios() {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const carregarUsuarios = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await usuariosAPI.listar()
+      setUsuarios(data)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao carregar usuários'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const buscarUsuario = useCallback(async (id: string) => {
+    try {
+      return await usuariosAPI.buscarPorId(id)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao buscar usuário'
+      toast.error(message)
+      throw err
+    }
+  }, [])
+
+  const buscarUsuariosPorEmpresa = useCallback(async (empresaId: string) => {
+    try {
+      const data = await usuariosAPI.buscarPorEmpresa(empresaId)
+      setUsuarios(data)
+      return data
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao buscar usuários da empresa'
+      setError(message)
+      toast.error(message)
+      throw err
+    }
+  }, [])
+
+  useEffect(() => {
+    carregarUsuarios()
+  }, [carregarUsuarios])
+
+  return {
+    usuarios,
+    loading,
+    error,
+    carregarUsuarios,
+    buscarUsuario,
+    buscarUsuariosPorEmpresa
   }
 } 

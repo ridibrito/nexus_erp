@@ -2274,7 +2274,7 @@ const NFSEContent = () => {
                 id="ambiente"
                 className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md"
                 value={configuracoes.ambiente}
-                onChange={(e) => setConfiguracoes(prev => ({ ...prev, ambiente: e.target.value }))}
+                onChange={(e) => setConfiguracoes((prev: any) => ({ ...prev, ambiente: e.target.value }))}
               >
                 <option value="homologacao">Homologação</option>
                 <option value="producao">Produção</option>
@@ -2287,7 +2287,7 @@ const NFSEContent = () => {
                 id="certificado"
                 placeholder="certificado.p12"
                 value={configuracoes.certificado}
-                onChange={(e) => setConfiguracoes(prev => ({ ...prev, certificado: e.target.value }))}
+                onChange={(e) => setConfiguracoes((prev: any) => ({ ...prev, certificado: e.target.value }))}
               />
             </div>
             

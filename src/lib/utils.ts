@@ -91,6 +91,34 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
+// Máscara para valores monetários (R$)
+export function maskCurrency(value: string): string {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '')
+  
+  // Converte para centavos
+  const cents = numbers.padEnd(3, '0')
+  const reais = cents.slice(0, -2)
+  const centavos = cents.slice(-2)
+  
+  // Formata com vírgula e ponto
+  const formattedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  
+  // Retorna formatado como R$ X.XXX,XX
+  return `R$ ${formattedReais || '0'},${centavos}`
+}
+
+// Remove máscara de moeda e retorna número
+export function unmaskCurrency(value: string): number {
+  if (!value || value.trim() === '') return 0
+  
+  const numbers = value.replace(/\D/g, '')
+  if (numbers === '') return 0
+  
+  const result = parseFloat(numbers) / 100
+  return isNaN(result) ? 0 : result
+}
+
 export function formatDate(date: string | Date): string {
   return new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit',
