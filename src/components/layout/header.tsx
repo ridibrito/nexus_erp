@@ -29,6 +29,10 @@ export function Header() {
     }
   }
 
+  const handlePerfilClick = () => {
+    router.push('/perfil')
+  }
+
   const getUserName = () => {
     if (!user) return 'Usuário'
     
@@ -90,11 +94,11 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/perfil')}>
+            <DropdownMenuItem onClick={handlePerfilClick}>
               <User className="mr-2 h-4 w-4" />
               <span>Perfil</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/configuracoes')}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Configurações</span>
             </DropdownMenuItem>

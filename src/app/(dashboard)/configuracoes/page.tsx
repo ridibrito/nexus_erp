@@ -20,7 +20,8 @@ import {
   Mail as MailIcon,
   ChevronLeft,
   ChevronRight,
-  Edit
+  Edit,
+  Trash2
 } from 'lucide-react'
 import { MemberAvatarUpload } from '@/components/ui/member-avatar-upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +30,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { EditarEtapasModal } from '@/components/modals/editar-etapas-modal'
+import { pipelinesAPI } from '@/lib/api'
 
 // Componentes de conteúdo para cada seção
 const EmpresaContent = () => {
@@ -83,206 +86,102 @@ const EmpresaContent = () => {
   }
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [hasData, setHasData] = useState(false)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
+  const [empresa, setEmpresa] = useState<any>(null)
 
   useEffect(() => {
-    carregarDadosEmpresa()
-  }, [])
-
-  const carregarDadosEmpresa = async () => {
-    try {
-      setLoading(true)
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Usuário não autenticado')
-        return
-      }
-
-      // Buscar empresa do usuário atual
-      const { data: usuario, error: usuarioError } = await supabase
-        .from('usuarios')
-        .select('empresa_id')
-        .eq('auth_user_id', user.id)
-        .eq('is_active', true)
-        .single()
-
-      let currentEmpresaId: string | null = null;
-      
-      if (usuarioError) {
-        console.error('Erro ao buscar usuário:', usuarioError)
+    const carregarDadosEmpresa = async () => {
+      try {
+        setLoading(true)
         
-        // Usar a empresa Nexus como padrão
-        currentEmpresaId = 'd9c4338e-42b1-421c-a119-60cabfcb88ac'
-        console.log('Usando empresa Nexus:', currentEmpresaId)
-      } else if (usuario?.empresa_id) {
-        currentEmpresaId = usuario.empresa_id
-        console.log('Empresa encontrada:', usuario.empresa_id)
-      } else {
-        // Usar a empresa Nexus como padrão
-        currentEmpresaId = 'd9c4338e-42b1-421c-a119-60cabfcb88ac'
-        console.log('Usando empresa Nexus como padrão:', currentEmpresaId)
-      }
-      
-      setWorkspaceId(currentEmpresaId) // Mantendo o nome da variável para compatibilidade
-      
-      // Carregar dados da empresa
-      if (currentEmpresaId) {
-        console.log('🔍 Buscando dados da empresa:', currentEmpresaId)
-        
-        const { data: empresa, error } = await supabase
-          .from('empresas')
-          .select('*')
-          .eq('id', currentEmpresaId)
-          .eq('is_active', true)
-          .single()
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('❌ Erro ao carregar dados da empresa:', error)
-          toast.error('Erro ao carregar dados da empresa')
+        // Buscar usuário atual
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          console.log('Usuário não autenticado')
           return
         }
 
-        if (empresa) {
-          console.log('✅ Dados da empresa encontrados:', empresa)
-          console.log('📍 Endereço original:', empresa.endereco)
-          console.log('📍 Tipo do endereço:', typeof empresa.endereco)
-          
-          // Usar a função para garantir que o endereco seja um objeto válido
-          const enderecoData = getEnderecoValido(empresa.endereco)
-          console.log('📍 Endereço processado:', enderecoData)
-          
-          const dadosProcessados = {
-            razao_social: empresa.razao_social || '',
-            nome_fantasia: empresa.nome_fantasia || '',
-            cnpj: empresa.cnpj || '',
-            inscricao_estadual: empresa.inscricao_estadual || '',
-            email: empresa.email || '',
-            telefone: empresa.telefone || '',
-            endereco: enderecoData
-          }
-          
-          console.log('📋 Dados processados para o estado:', dadosProcessados)
-          setEmpresaData(dadosProcessados)
-          setHasData(true) // Marcar que há dados salvos
-        } else {
-          console.log('⚠️ Nenhum dado da empresa encontrado:', currentEmpresaId)
-          setHasData(false) // Marcar que não há dados salvos
-        }
-      }
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados da empresa:', error)
-      toast.error('Erro ao carregar dados da empresa')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const salvarDadosEmpresa = async () => {
-    try {
-      setSaving(true)
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        toast.error('Usuário não autenticado')
-        return
-      }
-
-      // Se não temos empresaId, buscar do usuário atual
-      let currentEmpresaId = workspaceId; // Mantendo o nome da variável para compatibilidade
-      if (!currentEmpresaId) {
+        // Buscar dados do usuário na tabela usuarios
         const { data: usuario } = await supabase
           .from('usuarios')
-          .select('empresa_id')
+          .select('empresa_id, cargo')
           .eq('auth_user_id', user.id)
           .eq('is_active', true)
           .single()
 
         if (usuario?.empresa_id) {
-          currentEmpresaId = usuario.empresa_id
-          setWorkspaceId(usuario.empresa_id)
+          setEmpresaId(usuario.empresa_id) // Mantendo o nome da variável para compatibilidade
+          
+          // Buscar dados da empresa
+          const { data: empresaData } = await supabase
+            .from('empresas')
+            .select('*')
+            .eq('id', usuario.empresa_id)
+            .single()
+
+          if (empresaData) {
+            setEmpresa(empresaData)
+          }
         } else {
-          // Usar a empresa Nexus como padrão
-          currentEmpresaId = 'd9c4338e-42b1-421c-a119-60cabfcb88ac'
-          setWorkspaceId('d9c4338e-42b1-421c-a119-60cabfcb88ac')
-          console.log('Usando empresa Nexus como padrão para salvar')
+          // Se não encontrar empresa, usar empresa padrão
+          setEmpresaId('d9c4338e-42b1-421c-a119-60cabfcb88ac')
         }
+      } catch (error) {
+        console.error('Erro ao carregar dados da empresa:', error)
+        // Em caso de erro, usar empresa padrão
+        setEmpresaId('d9c4338e-42b1-421c-a119-60cabfcb88ac')
+      } finally {
+        setLoading(false)
       }
-      if (!currentEmpresaId) {
-        toast.error('Empresa não encontrada')
-        return
-      }
+    }
 
-      console.log('💾 Salvando dados da empresa:', currentEmpresaId)
-      console.log('📋 Dados atuais do estado:', empresaData)
+    carregarDadosEmpresa()
+  }, [])
 
-      // Verificar se já existe registro
-      const { data: empresaExistente } = await supabase
+  // Sincronizar dados da empresa com o formulário
+  useEffect(() => {
+    if (empresa) {
+      setEmpresaData({
+        razao_social: empresa.razao_social || empresa.nome || '',
+        nome_fantasia: empresa.nome_fantasia || empresa.nome || '',
+        cnpj: empresa.cnpj || '',
+        inscricao_estadual: empresa.inscricao_estadual || '',
+        email: empresa.email || '',
+        telefone: empresa.telefone || '',
+        endereco: getEnderecoValido(empresa.endereco)
+      })
+    }
+  }, [empresa])
+
+  const handleSalvarEmpresa = async (dados: any) => {
+    if (!empresaId) {
+      toast.error('Empresa não encontrada')
+      return
+    }
+
+    try {
+      const { error } = await supabase
         .from('empresas')
-        .select('id')
-        .eq('id', currentEmpresaId)
-        .eq('is_active', true)
+        .update(dados)
+        .eq('id', empresaId)
+
+      if (error) throw error
+
+      toast.success('Dados da empresa atualizados com sucesso!')
+      
+      // Recarregar dados da empresa
+      const { data: empresaAtualizada } = await supabase
+        .from('empresas')
+        .select('*')
+        .eq('id', empresaId)
         .single()
 
-      // Garantir que o endereço seja sempre um objeto válido antes de salvar
-      const dadosParaSalvar = {
-        ...empresaData,
-        endereco: getEnderecoValido(empresaData.endereco)
+      if (empresaAtualizada) {
+        setEmpresa(empresaAtualizada)
       }
-      
-      console.log('📤 Dados preparados para salvar:', dadosParaSalvar)
-      console.log('📍 Endereço que será salvo:', dadosParaSalvar.endereco)
-      
-      if (empresaExistente) {
-        console.log('🔄 Atualizando empresa existente com ID:', empresaExistente.id)
-        // Atualizar registro existente
-        const { error } = await supabase
-          .from('empresas')
-          .update({
-            ...dadosParaSalvar,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', empresaExistente.id)
-
-        if (error) {
-          console.error('❌ Erro ao atualizar empresa:', error)
-          throw error
-        }
-        console.log('✅ Empresa atualizada com sucesso')
-      } else {
-        console.log('🆕 Criando nova empresa')
-        // Criar novo registro
-        const { error } = await supabase
-          .from('empresas')
-          .insert({
-            id: currentEmpresaId,
-            ...dadosParaSalvar,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-
-        if (error) {
-          console.error('❌ Erro ao inserir empresa:', error)
-          throw error
-        }
-        console.log('✅ Empresa criada com sucesso')
-      }
-
-      toast.success('Dados da empresa salvos com sucesso!')
-      
-      // Marcar que há dados salvos
-      setHasData(true)
-      
-      // Recarregar dados após salvar para garantir sincronização
-      console.log('🔄 Recarregando dados após salvar...')
-      await carregarDadosEmpresa()
     } catch (error) {
       console.error('Erro ao salvar dados da empresa:', error)
       toast.error('Erro ao salvar dados da empresa')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -319,7 +218,7 @@ const EmpresaContent = () => {
       <div>
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-gray-900">Dados da Empresa</h2>
-          {hasData && (
+          {empresa && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
               ✓ Dados salvos
             </span>
@@ -474,7 +373,7 @@ const EmpresaContent = () => {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={salvarDadosEmpresa} disabled={saving} size="lg">
+        <Button onClick={() => handleSalvarEmpresa(empresaData)} disabled={saving} size="lg">
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -482,8 +381,8 @@ const EmpresaContent = () => {
             </>
           ) : (
             <>
-              {hasData && <Edit className="h-4 w-4 mr-2" />}
-              {hasData ? 'Editar Dados da Empresa' : 'Salvar Dados da Empresa'}
+              {empresa && <Edit className="h-4 w-4 mr-2" />}
+              {empresa ? 'Editar Dados da Empresa' : 'Salvar Dados da Empresa'}
             </>
           )}
         </Button>
@@ -496,7 +395,7 @@ const UsuariosContent = () => {
   const [activeTab, setActiveTab] = useState('lista')
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
 
@@ -528,7 +427,7 @@ const UsuariosContent = () => {
         .single()
 
       if (usuario?.empresa_id) {
-        setWorkspaceId(usuario.empresa_id) // Mantendo o nome da variável para compatibilidade
+        setEmpresaId(usuario.empresa_id)
         
         // Carregar todos os usuários da empresa
         const { data: usuariosData, error } = await supabase
@@ -571,7 +470,7 @@ const UsuariosContent = () => {
 
   const adicionarUsuario = async () => {
     try {
-      if (!workspaceId) {
+      if (!empresaId) {
         toast.error('Empresa não encontrada')
         return
       }
@@ -579,7 +478,7 @@ const UsuariosContent = () => {
       const { error } = await supabase
         .from('usuarios')
         .insert({
-          empresa_id: workspaceId, // Mantendo o nome da variável para compatibilidade
+          empresa_id: empresaId,
           nome: newUser.nome,
           email: newUser.email,
           cargo: newUser.cargo,
@@ -1089,15 +988,19 @@ const PipelinesContent = () => {
   const [pipelines, setPipelines] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingPipeline, setEditingPipeline] = useState<any>(null)
   const [pipelineData, setPipelineData] = useState({
     nome: '',
     descricao: '',
-    cor: '#3B82F6',
-    ativo: true
+    cor: '#3B82F6'
   })
+  
+  // Estados para edição de etapas
+  const [showEtapasModal, setShowEtapasModal] = useState(false)
+  const [editingEtapasPipeline, setEditingEtapasPipeline] = useState<any>(null)
+  const [etapasData, setEtapasData] = useState<any[]>([])
 
   useEffect(() => {
     carregarPipelines()
@@ -1110,22 +1013,22 @@ const PipelinesContent = () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Buscar workspace do usuário
-      const { data: membros } = await supabase
-        .from('membros')
-        .select('workspace_id')
-        .eq('user_id', user.id)
+      // Buscar empresa do usuário
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('auth_user_id', user.id)
         .eq('is_active', true)
         .single()
 
-      if (membros?.workspace_id) {
-        setWorkspaceId(membros.workspace_id)
+      if (usuario?.empresa_id) {
+        setEmpresaId(usuario.empresa_id)
         
         // Carregar pipelines
         const { data: pipelinesData, error } = await supabase
           .from('pipelines')
           .select('*, pipeline_etapas(*)')
-          .eq('workspace_id', membros.workspace_id)
+          .eq('empresa_id', usuario.empresa_id)
           .order('nome')
 
         if (error) throw error
@@ -1141,17 +1044,27 @@ const PipelinesContent = () => {
 
   const salvarPipeline = async () => {
     try {
+      console.log('=== INICIANDO salvarPipeline() ===')
+      console.log('empresaId:', empresaId)
+      console.log('pipelineData:', pipelineData)
+      console.log('editingPipeline:', editingPipeline)
+      
       setSaving(true)
       
-      if (!workspaceId) {
-        toast.error('Workspace não encontrado')
+      if (!empresaId) {
+        console.log('❌ Empresa não encontrada')
+        toast.error('Empresa não encontrada')
         return
       }
 
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        console.log('❌ Usuário não autenticado')
+        return
+      }
 
       if (editingPipeline) {
+        console.log('🔄 Atualizando pipeline existente...')
         // Atualizar pipeline existente
         const { error } = await supabase
           .from('pipelines')
@@ -1161,14 +1074,26 @@ const PipelinesContent = () => {
           })
           .eq('id', editingPipeline.id)
 
-        if (error) throw error
+        if (error) {
+          console.log('❌ Erro ao atualizar pipeline:', error)
+          throw error
+        }
+        console.log('✅ Pipeline atualizado com sucesso')
         toast.success('Pipeline atualizado com sucesso!')
       } else {
+        console.log('🆕 Criando novo pipeline...')
+        console.log('Dados para inserção:', {
+          empresa_id: empresaId,
+          ...pipelineData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        
         // Criar novo pipeline
         const { data: newPipeline, error } = await supabase
           .from('pipelines')
           .insert({
-            workspace_id: workspaceId,
+            empresa_id: empresaId,
             ...pipelineData,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -1176,7 +1101,15 @@ const PipelinesContent = () => {
           .select()
           .single()
 
-        if (error) throw error
+        if (error) {
+          console.log('❌ Erro ao criar pipeline:', error)
+          console.log('Código do erro:', error.code)
+          console.log('Mensagem do erro:', error.message)
+          console.log('Detalhes do erro:', error.details)
+          throw error
+        }
+
+        console.log('✅ Pipeline criado com sucesso:', newPipeline)
 
         // Criar etapas padrão
         const etapasPadrao = [
@@ -1187,27 +1120,39 @@ const PipelinesContent = () => {
           { nome: 'Fechado', ordem: 5, cor: '#8B5CF6' }
         ]
 
+        console.log('🔄 Criando etapas padrão...')
         for (const etapa of etapasPadrao) {
-          await supabase
+          console.log('Criando etapa:', etapa)
+          const { error: etapaError } = await supabase
             .from('pipeline_etapas')
             .insert({
               pipeline_id: newPipeline.id,
-              workspace_id: workspaceId,
+              empresa_id: empresaId,
               ...etapa,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
+          
+          if (etapaError) {
+            console.log('❌ Erro ao criar etapa:', etapaError)
+            throw etapaError
+          }
         }
 
+        console.log('✅ Etapas criadas com sucesso')
         toast.success('Pipeline criado com sucesso!')
       }
 
       setShowModal(false)
       setEditingPipeline(null)
-      setPipelineData({ nome: '', descricao: '', cor: '#3B82F6', ativo: true })
+      setPipelineData({ nome: '', descricao: '', cor: '#3B82F6' })
       carregarPipelines()
     } catch (error) {
-      console.error('Erro ao salvar pipeline:', error)
+      console.error('❌ Erro ao salvar pipeline:', error)
+      console.log('Tipo do erro:', typeof error)
+      console.log('Erro é instância de Error?', error instanceof Error)
+      console.log('Mensagem do erro:', error instanceof Error ? error.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(error, null, 2))
       toast.error('Erro ao salvar pipeline')
     } finally {
       setSaving(false)
@@ -1219,31 +1164,49 @@ const PipelinesContent = () => {
     setPipelineData({
       nome: pipeline.nome,
       descricao: pipeline.descricao || '',
-      cor: pipeline.cor || '#3B82F6',
-      ativo: pipeline.ativo
+      cor: pipeline.cor || '#3B82F6'
     })
     setShowModal(true)
   }
 
-  const togglePipelineStatus = async (pipelineId: string, novoStatus: boolean) => {
+  const editarEtapasPipeline = async (pipeline: any) => {
     try {
-      const { error } = await supabase
-        .from('pipelines')
-        .update({ ativo: novoStatus })
-        .eq('id', pipelineId)
-
-      if (error) throw error
-
-      setPipelines(prev => prev.map(p => 
-        p.id === pipelineId ? { ...p, ativo: novoStatus } : p
-      ))
-
-      toast.success(`Pipeline ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`)
+      console.log('=== INICIANDO editarEtapasPipeline ===')
+      console.log('Pipeline recebido:', pipeline)
+      
+      setEditingEtapasPipeline(pipeline)
+      
+      // Carregar etapas do pipeline
+      console.log('Chamando pipelinesAPI.buscarComEtapas...')
+      const pipelineComEtapas = await pipelinesAPI.buscarComEtapas(pipeline.id)
+      console.log('Resultado buscarComEtapas:', pipelineComEtapas)
+      
+      if (pipelineComEtapas) {
+        console.log('Etapas encontradas:', pipelineComEtapas.etapas)
+        setEtapasData(pipelineComEtapas.etapas)
+      } else {
+        console.log('Nenhuma etapa encontrada')
+        setEtapasData([])
+      }
+      
+      setShowEtapasModal(true)
     } catch (error) {
-      console.error('Erro ao alterar status:', error)
-      toast.error('Erro ao alterar status do pipeline')
+      console.error('Erro ao carregar etapas:', error)
+      console.log('Tipo do erro:', typeof error)
+      console.log('Erro é instância de Error?', error instanceof Error)
+      console.log('Mensagem do erro:', error instanceof Error ? error.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(error, null, 2))
+      toast.error('Erro ao carregar etapas do pipeline')
     }
   }
+
+  const handleEtapasUpdated = () => {
+    carregarPipelines()
+  }
+
+
+
+  // Função removida pois a coluna 'ativo' não existe na tabela pipelines
 
   if (loading) {
     return (
@@ -1287,9 +1250,9 @@ const PipelinesContent = () => {
             <div className="flex items-center gap-2">
               <Target className="h-5 w-5 text-green-600" />
               <div>
-                <p className="text-sm text-gray-600">Pipelines Ativos</p>
+                <p className="text-sm text-gray-600">Total de Pipelines</p>
                 <p className="text-2xl font-semibold">
-                  {pipelines.filter(p => p.ativo).length}
+                  {pipelines.length}
                 </p>
               </div>
             </div>
@@ -1350,14 +1313,6 @@ const PipelinesContent = () => {
                   </div>
                   
                   <div className="flex items-center gap-3">
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      pipeline.ativo 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {pipeline.ativo ? 'Ativo' : 'Inativo'}
-                    </div>
-                    
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -1369,9 +1324,9 @@ const PipelinesContent = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => togglePipelineStatus(pipeline.id, !pipeline.ativo)}
+                        onClick={() => editarEtapasPipeline(pipeline)}
                       >
-                        {pipeline.ativo ? 'Desativar' : 'Ativar'}
+                        Etapas
                       </Button>
                     </div>
                   </div>
@@ -1443,7 +1398,7 @@ const PipelinesContent = () => {
                 onClick={() => {
                   setShowModal(false)
                   setEditingPipeline(null)
-                  setPipelineData({ nome: '', descricao: '', cor: '#3B82F6', ativo: true })
+                  setPipelineData({ nome: '', descricao: '', cor: '#3B82F6' })
                 }}
                 className="flex-1"
               >
@@ -1453,15 +1408,18 @@ const PipelinesContent = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Etapas */}
+      <EditarEtapasModal
+        open={showEtapasModal}
+        onOpenChange={setShowEtapasModal}
+        pipeline={editingEtapasPipeline}
+        etapas={etapasData}
+        onEtapasUpdated={handleEtapasUpdated}
+      />
     </div>
   )
 }
-
-
-
-
-
-
 
 const ServicosContent = () => {
   const [servicos, setServicos] = useState<any[]>([])

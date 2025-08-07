@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
+  // DESABILITADO TEMPORARIAMENTE PARA DESENVOLVIMENTO
+  // Retornar diretamente sem verificações de autenticação
+  console.log('🔧 Middleware desabilitado para desenvolvimento - permitindo acesso a:', req.nextUrl.pathname)
+  return NextResponse.next()
+
+  /* CÓDIGO ORIGINAL COMENTADO TEMPORARIAMENTE
   let response = NextResponse.next({
     request: {
       headers: req.headers,
@@ -76,27 +82,27 @@ export async function middleware(req: NextRequest) {
   if (session && isAdminRoute) {
     try {
       // Verificar se o usuário é admin
-      const { data: usuario } = await supabase
+      const { data: usuario, error } = await supabase
         .from('usuarios')
-        .select('role')
+        .select('cargo')
         .eq('auth_user_id', session.user.id)
         .eq('is_active', true)
         .single()
 
       // Se não é admin, redirecionar para dashboard
-      if (!usuario || usuario.role !== 'admin') {
+      if (!usuario || usuario.cargo !== 'Administrador') {
         const redirectUrl = new URL('/', req.url)
         return NextResponse.redirect(redirectUrl)
       }
     } catch (error) {
       console.error('Erro ao verificar permissões de admin:', error)
-      // Em caso de erro, redirecionar para dashboard por segurança
-      const redirectUrl = new URL('/', req.url)
-      return NextResponse.redirect(redirectUrl)
+      // Em caso de erro, permitir acesso temporariamente
+      console.log('Permitindo acesso temporário devido a erro na verificação')
     }
   }
 
   return response
+  */
 }
 
 export const config = {

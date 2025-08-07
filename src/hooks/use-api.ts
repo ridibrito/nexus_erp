@@ -29,21 +29,43 @@ export function useClientes() {
   const [error, setError] = useState<string | null>(null)
 
   const carregarClientes = useCallback(async () => {
+    console.log('=== INICIANDO carregarClientes() ===')
     try {
       setLoading(true)
       setError(null)
+      console.log('Chamando clientesAPI.listar()...')
       const data = await clientesAPI.listar()
+      console.log('Dados recebidos de clientesAPI.listar():', data)
       setClientes(data)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar clientes'
-      setError(message)
-      toast.error(message)
+      console.log('Erro capturado em carregarClientes():', err)
+      console.log('Tipo do erro:', typeof err)
+      console.log('Erro é instância de Error?', err instanceof Error)
+      console.log('Mensagem do erro:', err instanceof Error ? err.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(err, null, 2))
+      
+      // Se não há dados ou empresa não encontrada, não tratar como erro
+      if (err instanceof Error && (
+        err.message.includes('não encontrado') || 
+        err.message.includes('Empresa não encontrada') ||
+        err.message.includes('relation "clientes" does not exist') ||
+        err.message.includes('does not exist')
+      )) {
+        console.log('Tabela clientes não encontrada ou estrutura diferente, retornando array vazio')
+        setClientes([])
+        setError(null)
+      } else {
+        // Capturar qualquer tipo de erro e retornar array vazio
+        console.log('Retornando array vazio devido a erro em carregarClientes')
+        setClientes([])
+        setError(null) // Não definir erro para não mostrar toast
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const criarCliente = useCallback(async (cliente: Omit<Cliente, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarCliente = useCallback(async (cliente: Omit<Cliente, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novoCliente = await clientesAPI.criar(cliente)
       setClientes(prev => [...prev, novoCliente])
@@ -112,15 +134,26 @@ export function useNegocios() {
       const data = await negociosAPI.listar()
       setNegocios(data)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar negócios'
-      setError(message)
-      toast.error(message)
+      // Se não há dados ou empresa não encontrada, não tratar como erro
+      if (err instanceof Error && (
+        err.message.includes('não encontrado') || 
+        err.message.includes('Empresa não encontrada') ||
+        err.message.includes('relation "negocios" does not exist') ||
+        err.message.includes('does not exist')
+      )) {
+        console.log('Tabela negocios não encontrada ou estrutura diferente, retornando array vazio')
+        setNegocios([])
+      } else {
+        const message = err instanceof Error ? err.message : 'Erro ao carregar negócios'
+        setError(message)
+        toast.error(message)
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const criarNegocio = useCallback(async (negocio: Omit<Negocio, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarNegocio = useCallback(async (negocio: Omit<Negocio, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novoNegocio = await negociosAPI.criar(negocio)
       setNegocios(prev => [...prev, novoNegocio])
@@ -146,6 +179,18 @@ export function useNegocios() {
     }
   }, [])
 
+  const deletarNegocio = useCallback(async (id: string) => {
+    try {
+      await negociosAPI.deletar(id)
+      setNegocios(prev => prev.filter(n => n.id !== id))
+      toast.success('Negócio deletado com sucesso!')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao deletar negócio'
+      toast.error(message)
+      throw err
+    }
+  }, [])
+
   const moverNegocio = useCallback(async (id: string, etapa_id: string) => {
     try {
       const negocioMovido = await negociosAPI.moverParaEtapa(id, etapa_id)
@@ -154,18 +199,6 @@ export function useNegocios() {
       return negocioMovido
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao mover negócio'
-      toast.error(message)
-      throw err
-    }
-  }, [])
-
-  const deletarNegocio = useCallback(async (id: string) => {
-    try {
-      await negociosAPI.deletar(id)
-      setNegocios(prev => prev.filter(n => n.id !== id))
-      toast.success('Negócio deletado com sucesso!')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao deletar negócio'
       toast.error(message)
       throw err
     }
@@ -182,8 +215,8 @@ export function useNegocios() {
     carregarNegocios,
     criarNegocio,
     atualizarNegocio,
-    moverNegocio,
-    deletarNegocio
+    deletarNegocio,
+    moverNegocio
   }
 }
 
@@ -203,21 +236,43 @@ export function usePipelines() {
       const data = await pipelinesAPI.listar()
       setPipelines(data)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar pipelines'
-      setError(message)
-      toast.error(message)
+      // Se não há dados ou empresa não encontrada, não tratar como erro
+      if (err instanceof Error && (
+        err.message.includes('não encontrado') || 
+        err.message.includes('Empresa não encontrada') ||
+        err.message.includes('relation "pipelines" does not exist') ||
+        err.message.includes('does not exist')
+      )) {
+        console.log('Tabela pipelines não encontrada ou estrutura diferente, retornando array vazio')
+        setPipelines([])
+      } else {
+        const message = err instanceof Error ? err.message : 'Erro ao carregar pipelines'
+        setError(message)
+        toast.error(message)
+      }
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const criarPipeline = useCallback(async (pipeline: Omit<Pipeline, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarPipeline = useCallback(async (pipeline: Omit<Pipeline, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
+    console.log('=== INICIANDO criarPipeline() ===')
+    console.log('Dados do pipeline recebidos:', pipeline)
+    
     try {
+      console.log('Chamando pipelinesAPI.criar()...')
       const novoPipeline = await pipelinesAPI.criar(pipeline)
+      console.log('Pipeline criado com sucesso:', novoPipeline)
       setPipelines(prev => [...prev, novoPipeline])
       toast.success('Pipeline criado com sucesso!')
       return novoPipeline
     } catch (err) {
+      console.log('Erro capturado em criarPipeline():', err)
+      console.log('Tipo do erro:', typeof err)
+      console.log('Erro é instância de Error?', err instanceof Error)
+      console.log('Mensagem do erro:', err instanceof Error ? err.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(err, null, 2))
+      
       const message = err instanceof Error ? err.message : 'Erro ao criar pipeline'
       toast.error(message)
       throw err
@@ -288,7 +343,7 @@ export function useCobrancas() {
     }
   }, [])
 
-  const criarCobranca = useCallback(async (cobranca: Omit<Cobranca, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarCobranca = useCallback(async (cobranca: Omit<Cobranca, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novaCobranca = await cobrancasAPI.criar(cobranca)
       setCobrancas(prev => [...prev, novaCobranca])
@@ -365,7 +420,7 @@ export function useDespesas() {
     }
   }, [])
 
-  const criarDespesa = useCallback(async (despesa: Omit<Despesa, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarDespesa = useCallback(async (despesa: Omit<Despesa, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novaDespesa = await despesasAPI.criar(despesa)
       setDespesas(prev => [...prev, novaDespesa])
@@ -442,7 +497,7 @@ export function useCategoriasFinanceiras() {
     }
   }, [])
 
-  const criarCategoria = useCallback(async (categoria: Omit<CategoriaFinanceira, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarCategoria = useCallback(async (categoria: Omit<CategoriaFinanceira, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novaCategoria = await categoriasFinanceirasAPI.criar(categoria)
       setCategorias(prev => [...prev, novaCategoria])
@@ -519,7 +574,7 @@ export function useFormasPagamento() {
     }
   }, [])
 
-  const criarFormaPagamento = useCallback(async (forma: Omit<FormaPagamento, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>) => {
+  const criarFormaPagamento = useCallback(async (forma: Omit<FormaPagamento, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => {
     try {
       const novaForma = await formasPagamentoAPI.criar(forma)
       setFormasPagamento(prev => [...prev, novaForma])

@@ -30,7 +30,7 @@ export function AuthGuard({
         window.location.href = redirectTo
       } else if (!requireAuth && user) {
         console.log('✅ Usuário autenticado, redirecionando para dashboard')
-        window.location.href = '/dashboard'
+        window.location.href = '/'
       }
     }
   }, [user, loading, requireAuth, redirectTo, router])

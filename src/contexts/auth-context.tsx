@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ Usuário logado, redirecionando...')
           // Usar window.location para garantir redirecionamento
-          window.location.href = '/dashboard'
+          window.location.href = '/'
         }
       }
     )

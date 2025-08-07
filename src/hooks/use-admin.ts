@@ -14,17 +14,24 @@ export function useAdmin() {
       setLoading(true)
       
       const { data: { user } } = await supabase.auth.getUser()
+      
       if (!user) {
         setIsAdmin(false)
         return
       }
 
-      const { data: usuario } = await supabase
+      const { data: usuario, error } = await supabase
         .from('usuarios')
         .select('role')
         .eq('auth_user_id', user.id)
         .eq('is_active', true)
         .single()
+
+      if (error) {
+        console.error('Erro ao buscar usuário:', error)
+        setIsAdmin(false)
+        return
+      }
 
       setIsAdmin(usuario?.role === 'admin')
     } catch (error) {

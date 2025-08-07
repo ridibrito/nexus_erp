@@ -49,9 +49,25 @@ import {
 } from 'recharts'
 import { supabase } from '@/lib/supabase'
 
+interface DashboardData {
+  totalClientes: number
+  clientesAtivos: number
+  novosEsteMes: number
+  ticketMedio: number
+  contasPagar: any[]
+  contasReceber: any[]
+  saldoContas: any[]
+  fluxoDiario: any[]
+  receitaMensal: any[]
+  mrr: any[]
+  receitaPorServico: any[]
+  tarefasCRM: any[]
+}
+
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
-  const [dashboardData, setDashboardData] = useState({
+  const [empresa, setEmpresa] = useState<any>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData>({
     totalClientes: 0,
     clientesAtivos: 0,
     novosEsteMes: 0,
@@ -77,33 +93,53 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Buscar workspace do usuário
-      const { data: membros } = await supabase
-        .from('membros')
-        .select('workspace_id')
-        .eq('user_id', user.id)
+      // Buscar empresa do usuário
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('empresa_id')
+        .eq('auth_user_id', user.id)
         .eq('is_active', true)
         .single()
 
-      if (!membros?.workspace_id) return
+      if (!usuario?.empresa_id) {
+        console.log('Usuário não tem empresa_id')
+        return
+      }
 
-      const workspaceId = membros.workspace_id
+      const empresaId = usuario.empresa_id
+
+      // Buscar dados completos da empresa
+      const { data: empresaData, error: empresaError } = await supabase
+        .from('empresas')
+        .select('*')
+        .eq('id', empresaId)
+        .single()
+
+      if (empresaError) {
+        console.error('Erro ao buscar empresa:', empresaError)
+        return
+      }
+
+      if (empresaData) {
+        setEmpresa(empresaData)
+        console.log('Dados da empresa carregados:', empresaData)
+      }
 
       // Carregar dados dos clientes
       const { data: clientes } = await supabase
         .from('clientes')
         .select('*')
-        .eq('workspace_id', workspaceId)
+        .eq('empresa_id', empresaId)
 
       // Carregar dados dos negócios
       const { data: negocios } = await supabase
         .from('negocios')
         .select('*')
-        .eq('workspace_id', workspaceId)
+        .eq('empresa_id', empresaId)
 
       // Processar dados
       const totalClientes = clientes?.length || 0
-      const clientesAtivos = clientes?.filter(c => c.is_active).length || 0
+      const clientesAtivos = clientes?.filter(c => c.status === 'ativo').length || 0
       const novosEsteMes = clientes?.filter(c => {
         const createdDate = new Date(c.created_at)
         const now = new Date()
@@ -115,10 +151,10 @@ export default function DashboardPage() {
       const ticketMedio = totalClientes > 0 ? valorTotalNegocios / totalClientes : 0
 
       // Dados vazios para demonstração (serão substituídos por dados reais)
-      const contasPagar = []
-      const contasReceber = []
-      const saldoContas = []
-      const fluxoDiario = [
+      const contasPagar: any[] = []
+      const contasReceber: any[] = []
+      const saldoContas: any[] = []
+      const fluxoDiario: any[] = [
         { dia: 'Seg', entrada: 0, saida: 0 },
         { dia: 'Ter', entrada: 0, saida: 0 },
         { dia: 'Qua', entrada: 0, saida: 0 },
@@ -127,10 +163,10 @@ export default function DashboardPage() {
         { dia: 'Sab', entrada: 0, saida: 0 },
         { dia: 'Dom', entrada: 0, saida: 0 },
       ]
-      const receitaMensal = []
-      const mrr = []
-      const receitaPorServico = []
-      const tarefasCRM = []
+      const receitaMensal: any[] = []
+      const mrr: any[] = []
+      const receitaPorServico: any[] = []
+      const tarefasCRM: any[] = []
 
       setDashboardData({
         totalClientes,
@@ -168,7 +204,14 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         <div className="mb-8">
-          <h1 className="text-xl font-semibold text-gray-900">Dashboard ERP Nexus</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            Dashboard ERP Nexus
+            {empresa && (
+              <span className="text-sm font-normal text-gray-600 ml-2">
+                - {empresa.nome_fantasia || empresa.nome}
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-gray-600 mt-1">Visão estratégica do seu negócio</p>
         </div>
 
@@ -207,28 +250,28 @@ export default function DashboardPage() {
 
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Novos Este Mês</CardTitle>
-              <Zap className="h-4 w-4 text-orange-600" />
+              <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
+              <DollarSign className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{dashboardData.novosEsteMes}</div>
+              <div className="text-2xl font-bold">
+                R$ {dashboardData.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
               <div className="flex items-center text-xs mt-1">
-                <ArrowUpRight className="h-3 w-3 mr-1 text-green-600" />
-                +{dashboardData.novosEsteMes} vs mês anterior
+                <span>Por cliente</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-              <DollarSign className="h-4 w-4 text-purple-600" />
+              <CardTitle className="text-sm font-medium">Novos Este Mês</CardTitle>
+              <TrendingUp className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">R$ {dashboardData.ticketMedio.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{dashboardData.novosEsteMes}</div>
               <div className="flex items-center text-xs mt-1">
-                <ArrowUpRight className="h-3 w-3 mr-1 text-green-600" />
-                +8% este mês
+                <span>Clientes</span>
               </div>
             </CardContent>
           </Card>
@@ -564,6 +607,45 @@ export default function DashboardPage() {
                   <p className="text-gray-500 text-sm">Nenhuma tarefa CRM em aberto</p>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Gráfico de Fluxo de Caixa */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Fluxo de Caixa Diário</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={dashboardData.fluxoDiario}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dia" />
+                  <YAxis />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="entrada" stackId="1" stroke="#10B981" fill="#10B981" />
+                  <Area type="monotone" dataKey="saida" stackId="1" stroke="#EF4444" fill="#EF4444" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Receita Mensal */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dashboardData.receitaMensal}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="receita" fill="#3B82F6" />
+                </BarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
