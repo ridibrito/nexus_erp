@@ -30,8 +30,8 @@ export default function LoginPage() {
       
       if (result.success) {
         console.log('✅ Login bem-sucedido, redirecionando...')
-        // Redirecionamento direto
-        window.location.href = '/dashboard'
+        // Usar router para redirecionamento
+        router.push('/')
       } else {
         console.log('❌ Erro no login:', result.error)
         // O erro já foi mostrado pelo toast no contexto

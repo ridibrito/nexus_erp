@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
-import { Loader2 } from 'lucide-react'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -16,6 +15,7 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('🚫 Usuário não autenticado, redirecionando para login')
       router.push('/auth/login')
     }
   }, [user, loading, router])
@@ -23,16 +23,20 @@ export function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
   if (loading) {
     return fallback || (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Carregando...</span>
-        </div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   if (!user) {
-    return null
+    return fallback || (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Redirecionando...</h2>
+          <p className="text-gray-600">Você será redirecionado para a página de login.</p>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>

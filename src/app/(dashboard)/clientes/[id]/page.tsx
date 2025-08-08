@@ -1,47 +1,19 @@
+import { buscarCliente } from '@/lib/api/clientes'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { Cliente } from '@/lib/api'
-import { ClienteDetalhesClient } from './cliente-detalhes-client'
+import { ClienteDetalhes } from './cliente-detalhes'
 
-interface ClienteDetalhesPageProps {
-  params: Promise<{
+interface ClientePageProps {
+  params: {
     id: string
-  }>
-}
-
-async function getCliente(id: string): Promise<Cliente | null> {
-  const supabase = createClient()
-  
-  const { data: cliente, error } = await supabase
-    .from('clientes')
-    .select(`
-      *,
-      empresa_vinculada:clientes!empresa_vinculada_id(
-        id,
-        nome_fant,
-        razao_social,
-        cnpj,
-        email,
-        telefone
-      )
-    `)
-    .eq('id', id)
-    .single()
-
-  if (error || !cliente) {
-    return null
   }
-
-  return cliente
 }
 
-export default async function ClienteDetalhesPage({ params }: ClienteDetalhesPageProps) {
-  const resolvedParams = await params
-  const cliente = await getCliente(resolvedParams.id)
-
-  if (!cliente) {
+export default async function ClientePage({ params }: ClientePageProps) {
+  const result = await buscarCliente(params.id)
+  
+  if (!result.success) {
     notFound()
   }
 
-  return <ClienteDetalhesClient cliente={cliente} />
+  return <ClienteDetalhes cliente={result.data} />
 }

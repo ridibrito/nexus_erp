@@ -1,9 +1,15 @@
-import { clientesAPI } from '@/lib/api'
+import { listarClientes } from '@/lib/api/clientes'
 import { ClientesClient } from './clientes-client'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 
 export default async function ClientesPage() {
   // Buscar dados no servidor
-  const clientes = await clientesAPI.listar()
+  const result = await listarClientes()
+  const clientes = result.success ? result.data : []
   
-  return <ClientesClient initialData={clientes} />
+  return (
+    <ProtectedRoute>
+      <ClientesClient initialData={clientes} />
+    </ProtectedRoute>
+  )
 } 

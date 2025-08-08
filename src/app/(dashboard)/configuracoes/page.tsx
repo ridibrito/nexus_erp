@@ -4849,7 +4849,17 @@ const configSections = [
   }
 ]
 
+import { ProtectedRoute } from '@/components/auth/protected-route'
+
 export default function ConfiguracoesPage() {
+  return (
+    <ProtectedRoute>
+      <ConfiguracoesContent />
+    </ProtectedRoute>
+  )
+}
+
+function ConfiguracoesContent() {
   const [activeSection, setActiveSection] = useState<string>('empresa')
   const [activeTab, setActiveTab] = useState<string>('dados-empresa')
   const [sidebarOpen, setSidebarOpen] = useState(() => {

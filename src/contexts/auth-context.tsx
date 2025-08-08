@@ -76,10 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       console.log('🔐 Iniciando login no contexto...')
+      console.log('📧 Email:', email)
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+
+      console.log('📊 Resposta do Supabase:', { data, error })
 
       if (error) {
         console.log('❌ Erro no login:', error.message)
@@ -88,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (data.user) {
         console.log('✅ Login bem-sucedido no contexto:', data.user.email)
+        console.log('🔑 Sessão:', data.session)
         toast.success('Login realizado com sucesso!')
         return { success: true }
       }

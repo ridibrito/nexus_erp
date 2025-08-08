@@ -9,10 +9,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useClientes, usePipelines, useUsuarios } from '@/hooks/use-api'
-import { type Negocio, clientesAPI } from '@/lib/api'
+import { type Negocio } from '@/lib/api'
 import { maskCurrency, unmaskCurrency } from '@/lib/utils'
 import { Plus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { criarCliente } from '@/lib/actions/clientes'
 
 interface NovoNegocioModalProps {
   open: boolean
@@ -174,37 +175,38 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
         return
       }
 
-      console.log('Chamando clientesAPI.criar...')
-      const novoCliente = await clientesAPI.criar({
-        nome_fant: clienteData.nome_fant,
-        razao_social: clienteData.razao_social || undefined,
-        cnpj: clienteData.cnpj || undefined,
-        email: clienteData.email || undefined,
-        telefone: clienteData.telefone || undefined,
-        tipo: 'pessoa_juridica',
-        status: 'ativo'
-      })
+      const formData = new FormData()
+      formData.append('nome', clienteData.nome_fant)
+      formData.append('email', clienteData.email || '')
+      formData.append('tipo', 'pessoa_juridica')
+      formData.append('telefone', clienteData.telefone || '')
 
-      console.log('Cliente criado com sucesso:', novoCliente)
-      toast.success('Cliente criado com sucesso!')
-      
-      // Recarregar lista de clientes
-      console.log('Recarregando lista de clientes...')
-      await carregarClientes()
-      
-      // Selecionar o cliente recém-criado
-      console.log('Selecionando cliente recém-criado:', novoCliente.id)
-      setFormData(prev => ({ ...prev, cliente_id: novoCliente.id }))
-      
-      // Fechar modal e limpar dados
-      setShowClienteModal(false)
-      setClienteData({
-        nome_fant: '',
-        razao_social: '',
-        cnpj: '',
-        email: '',
-        telefone: ''
-      })
+      const result = await criarCliente(formData)
+      if (result.success) {
+        const novoCliente = result.data
+        console.log('Cliente criado com sucesso:', novoCliente)
+        toast.success('Cliente criado com sucesso!')
+        
+        // Recarregar lista de clientes
+        console.log('Recarregando lista de clientes...')
+        await carregarClientes()
+        
+        // Selecionar o cliente recém-criado
+        console.log('Selecionando cliente recém-criado:', novoCliente.id)
+        setFormData(prev => ({ ...prev, cliente_id: novoCliente.id }))
+        
+        // Fechar modal e limpar dados
+        setShowClienteModal(false)
+        setClienteData({
+          nome_fant: '',
+          razao_social: '',
+          cnpj: '',
+          email: '',
+          telefone: ''
+        })
+      } else {
+        toast.error('Erro ao criar cliente')
+      }
     } catch (error) {
       console.error('Erro ao criar cliente:', error)
       console.log('Tipo do erro:', typeof error)

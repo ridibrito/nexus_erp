@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -65,6 +66,14 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  )
+}
+
+function DashboardContent() {
   const [loading, setLoading] = useState(true)
   const [empresa, setEmpresa] = useState<any>(null)
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -90,19 +99,43 @@ export default function DashboardPage() {
     try {
       setLoading(true)
       
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      // Verificar se as variáveis de ambiente estão definidas
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error('Variáveis de ambiente do Supabase não estão definidas')
+        setLoading(false)
+        return
+      }
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) {
+        console.error('Erro ao obter usuário:', userError)
+        setLoading(false)
+        return
+      }
+      
+      if (!user) {
+        console.log('Usuário não autenticado')
+        setLoading(false)
+        return
+      }
 
       // Buscar empresa do usuário
-      const { data: usuario } = await supabase
+      const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
         .select('empresa_id')
         .eq('auth_user_id', user.id)
         .eq('is_active', true)
         .single()
 
+      if (usuarioError) {
+        console.error('Erro ao buscar usuário:', usuarioError)
+        setLoading(false)
+        return
+      }
+
       if (!usuario?.empresa_id) {
         console.log('Usuário não tem empresa_id')
+        setLoading(false)
         return
       }
 
@@ -126,16 +159,24 @@ export default function DashboardPage() {
       }
 
       // Carregar dados dos clientes
-      const { data: clientes } = await supabase
+      const { data: clientes, error: clientesError } = await supabase
         .from('clientes')
         .select('*')
         .eq('empresa_id', empresaId)
 
+      if (clientesError) {
+        console.error('Erro ao carregar clientes:', clientesError)
+      }
+
       // Carregar dados dos negócios
-      const { data: negocios } = await supabase
+      const { data: negocios, error: negociosError } = await supabase
         .from('negocios')
         .select('*')
         .eq('empresa_id', empresaId)
+
+      if (negociosError) {
+        console.error('Erro ao carregar negócios:', negociosError)
+      }
 
       // Processar dados
       const totalClientes = clientes?.length || 0
@@ -184,6 +225,29 @@ export default function DashboardPage() {
       })
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error)
+      // Em caso de erro, definir dados padrão
+      setDashboardData({
+        totalClientes: 0,
+        clientesAtivos: 0,
+        novosEsteMes: 0,
+        ticketMedio: 0,
+        contasPagar: [],
+        contasReceber: [],
+        saldoContas: [],
+        fluxoDiario: [
+          { dia: 'Seg', entrada: 0, saida: 0 },
+          { dia: 'Ter', entrada: 0, saida: 0 },
+          { dia: 'Qua', entrada: 0, saida: 0 },
+          { dia: 'Qui', entrada: 0, saida: 0 },
+          { dia: 'Sex', entrada: 0, saida: 0 },
+          { dia: 'Sab', entrada: 0, saida: 0 },
+          { dia: 'Dom', entrada: 0, saida: 0 },
+        ],
+        receitaMensal: [],
+        mrr: [],
+        receitaPorServico: [],
+        tarefasCRM: []
+      })
     } finally {
       setLoading(false)
     }

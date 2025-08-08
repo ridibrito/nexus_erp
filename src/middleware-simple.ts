@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
-  console.log('🔍 Middleware - DESABILITADO - Rota:', req.nextUrl.pathname)
+  console.log('🔍 Middleware - SIMPLES - Rota:', req.nextUrl.pathname)
   
-  // Middleware desabilitado temporariamente para debug
+  // Middleware simples que apenas permite acesso
+  // A proteção será feita no lado do cliente
   return NextResponse.next()
 }
 

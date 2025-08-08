@@ -25,8 +25,17 @@ import { pipelinesAPI } from '@/lib/api'
 import { PipelineEtapa } from '@/lib/api'
 import { NovoNegocioModal } from '@/components/modals/novo-negocio-modal'
 import { Negocio } from '@/lib/api'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 
 export default function NegociosPage() {
+  return (
+    <ProtectedRoute>
+      <NegociosContent />
+    </ProtectedRoute>
+  )
+}
+
+function NegociosContent() {
   const router = useRouter()
   const { negocios, loading: loadingNegocios, error: errorNegocios, moverNegocio, criarNegocio } = useNegocios()
   const { pipelines, loading: loadingPipelines, error: errorPipelines } = usePipelines()

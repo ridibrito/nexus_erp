@@ -13,8 +13,10 @@ export interface Cliente {
   telefone?: string
   endereco?: any
   observacoes?: string
+  avatar?: string
   status?: 'ativo' | 'inativo' | 'prospecto'
   empresa_vinculada_id?: string
+  responsavel_id?: string
   created_at: string
   updated_at?: string
 }

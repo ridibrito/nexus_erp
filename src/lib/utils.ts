@@ -136,3 +136,44 @@ export function formatDateTime(date: string | Date): string {
     minute: '2-digit',
   }).format(new Date(date))
 } 
+
+// Função para detectar se é CPF ou CNPJ e aplicar máscara
+export function maskCPFCNPJ(value: string): string {
+  const numbers = value.replace(/\D/g, '')
+  
+  if (numbers.length <= 11) {
+    return maskCPF(value)
+  } else {
+    return maskCNPJ(value)
+  }
+}
+
+// Validação de CPF
+export function validateCPF(cpf: string): boolean {
+  const numbers = removeMask(cpf)
+  
+  if (numbers.length !== 11) return false
+  
+  // Verifica se todos os dígitos são iguais
+  if (/^(\d)\1+$/.test(numbers)) return false
+  
+  // Validação do primeiro dígito verificador
+  let sum = 0
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(numbers[i]) * (10 - i)
+  }
+  let digit = sum % 11
+  digit = digit < 2 ? 0 : 11 - digit
+  
+  if (parseInt(numbers[9]) !== digit) return false
+  
+  // Validação do segundo dígito verificador
+  sum = 0
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(numbers[i]) * (11 - i)
+  }
+  digit = sum % 11
+  digit = digit < 2 ? 0 : 11 - digit
+  
+  return parseInt(numbers[10]) === digit
+} 

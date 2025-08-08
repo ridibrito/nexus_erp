@@ -6,6 +6,12 @@ import { Cliente } from '@/lib/api'
 import { criarCliente, deletarCliente } from '@/lib/actions/clientes'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { MaskedInput } from '@/components/ui/masked-input'
+import { CNPJInput } from '@/components/ui/cnpj-input'
+import { Label } from '@/components/ui/label'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+
 import { 
   Plus, 
   Users, 
@@ -22,7 +28,9 @@ import {
   MapPin,
   Building2,
   User,
-  FileText
+  FileText,
+  Loader2,
+  ExternalLink
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -41,7 +49,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -50,6 +57,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { maskPhone, maskCPFCNPJ, validateCPF, validateCNPJ, removeMask } from '@/lib/utils'
 
 interface ClientesClientProps {
   initialData: Cliente[]
@@ -64,16 +72,125 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'pessoa_fisica' | 'pessoa_juridica'>('all')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [clienteToDelete, setClienteToDelete] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    tipo: 'pessoa_juridica' as 'pessoa_fisica' | 'pessoa_juridica',
+    nome: '',
+    cpf: '',
+    cnpj: '',
+    email: '',
+    telefone: ''
+  })
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleCNPJDataLoaded = (data: any) => {
+    setFormData(prev => ({
+      ...prev,
+      nome: data.razao_social || prev.nome,
+      cnpj: data.cnpj || prev.cnpj,
+      email: data.email || prev.email,
+      telefone: data.telefone || prev.telefone
+    }))
+    
+    // Se houver dados de endereço, salvar no localStorage para uso posterior
+    if (data.logradouro || data.municipio || data.uf || data.cep) {
+      const enderecoFormatado = {
+        logradouro: data.logradouro || '',
+        numero: data.numero || '',
+        complemento: data.complemento || '',
+        bairro: data.bairro || '',
+        cidade: data.municipio || '',
+        estado: data.uf || '',
+        cep: data.cep || ''
+      }
+      localStorage.setItem('cnpj_endereco', JSON.stringify(enderecoFormatado))
+    }
+  }
+
+  const validateForm = () => {
+    if (!formData.nome.trim()) {
+      toast.error('Nome é obrigatório')
+      return false
+    }
+
+    if (!formData.email.trim()) {
+      toast.error('Email é obrigatório')
+      return false
+    }
+
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Email inválido')
+      return false
+    }
+
+    // Validar CPF/CNPJ se foi preenchido
+    if (formData.cpf.trim()) {
+      const numbers = removeMask(formData.cpf)
+      if (numbers.length !== 11) {
+        toast.error('CPF deve ter 11 dígitos')
+        return false
+      }
+      if (!validateCPF(formData.cpf)) {
+        toast.error('CPF inválido')
+        return false
+      }
+    }
+
+    if (formData.cnpj.trim()) {
+      const numbers = removeMask(formData.cnpj)
+      if (numbers.length !== 14) {
+        toast.error('CNPJ deve ter 14 dígitos')
+        return false
+      }
+      if (!validateCNPJ(formData.cnpj)) {
+        toast.error('CNPJ inválido')
+        return false
+      }
+    }
+
+    return true
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
     
     try {
-      const result = await criarCliente(formData)
+      // Criar FormData
+      const formDataObj = new FormData()
+      formDataObj.append('tipo', formData.tipo)
+      formDataObj.append('nome', formData.nome)
+      formDataObj.append('cpf', formData.cpf)
+                     formDataObj.append('cnpj', formData.cnpj)
+        formDataObj.append('email', formData.email)
+        formDataObj.append('telefone', formData.telefone)
+
+      const result = await criarCliente(formDataObj)
       
       if (result.success) {
         toast.success('Cliente criado com sucesso!')
         setShowModal(false)
+                         // Limpar formulário
+        setFormData({
+          tipo: 'pessoa_juridica',
+          nome: '',
+          cpf: '',
+          cnpj: '',
+          email: '',
+          telefone: ''
+        })
+        // Recarregar página
         window.location.reload()
       } else {
         toast.error(result.error || 'Erro ao criar cliente')
@@ -86,15 +203,22 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja deletar este cliente?')) return
+  const handleDeleteClick = (id: string) => {
+    setClienteToDelete(id)
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!clienteToDelete) return
     
     try {
-      const result = await deletarCliente(id)
+      const result = await deletarCliente(clienteToDelete)
       
       if (result.success) {
         toast.success('Cliente deletado com sucesso!')
-        setClientes(clientes.filter(c => c.id !== id))
+        setClientes(clientes.filter(c => c.id !== clienteToDelete))
+        setShowDeleteModal(false)
+        setClienteToDelete(null)
       } else {
         toast.error(result.error || 'Erro ao deletar cliente')
       }
@@ -123,11 +247,11 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ativo':
-        return <Badge variant="default" className="bg-green-100 text-green-800">Ativo</Badge>
+        return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Ativo</Badge>
       case 'inativo':
-        return <Badge variant="secondary">Inativo</Badge>
+        return <Badge variant="secondary" className="bg-gray-100 text-gray-700">Inativo</Badge>
       case 'prospecto':
-        return <Badge variant="outline" className="text-orange-600">Prospecto</Badge>
+        return <Badge variant="outline" className="text-orange-600 border-orange-200">Prospecto</Badge>
       default:
         return <Badge variant="outline">Não definido</Badge>
     }
@@ -135,8 +259,8 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
 
   const getTipoBadge = (tipo: string) => {
     return tipo === 'pessoa_juridica' 
-      ? <Badge variant="outline" className="text-blue-600">Pessoa Jurídica</Badge>
-      : <Badge variant="outline" className="text-purple-600">Pessoa Física</Badge>
+      ? <Badge variant="outline" className="text-blue-600 border-blue-200">PJ</Badge>
+      : <Badge variant="outline" className="text-purple-600 border-purple-200">PF</Badge>
   }
 
   // Filtrar clientes
@@ -180,58 +304,58 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
     <div className="space-y-6">
       {/* Estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-r from-blue-50 to-blue-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Clientes</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-blue-700">Total de Clientes</CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalClientes}</div>
+            <div className="text-2xl font-bold text-blue-900">{totalClientes}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-r from-green-50 to-green-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-green-700">Clientes Ativos</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{clientesAtivos}</div>
+            <div className="text-2xl font-bold text-green-900">{clientesAtivos}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-r from-orange-50 to-orange-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Novos Este Mês</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-orange-700">Novos Este Mês</CardTitle>
+            <Calendar className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{novosEsteMes}</div>
+            <div className="text-2xl font-bold text-orange-900">{novosEsteMes}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-sm bg-gradient-to-r from-purple-50 to-purple-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Com Email</CardTitle>
-            <Mail className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-purple-700">Com Email</CardTitle>
+            <Mail className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{clientesComEmail}</div>
+            <div className="text-2xl font-bold text-purple-900">{clientesComEmail}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Controles */}
-      <Card>
+      <Card className="border-0 shadow-sm">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle className="text-lg">Clientes</CardTitle>
+              <CardTitle className="text-xl font-semibold">Clientes</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Gerencie seus clientes e relacionamentos comerciais
               </p>
             </div>
-            <Button onClick={() => setShowModal(true)}>
+            <Button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
             </Button>
@@ -246,7 +370,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                 placeholder="Buscar por nome, CPF/CNPJ ou email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
             <div className="flex gap-2">
@@ -254,6 +378,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                 variant={filterType === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilterType('all')}
+                className={filterType === 'all' ? 'bg-blue-600 hover:bg-blue-700' : ''}
               >
                 Todos
               </Button>
@@ -261,6 +386,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                 variant={filterType === 'pessoa_fisica' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilterType('pessoa_fisica')}
+                className={filterType === 'pessoa_fisica' ? 'bg-purple-600 hover:bg-purple-700' : ''}
               >
                 Pessoa Física
               </Button>
@@ -268,34 +394,38 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                 variant={filterType === 'pessoa_juridica' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilterType('pessoa_juridica')}
+                className={filterType === 'pessoa_juridica' ? 'bg-blue-600 hover:bg-blue-700' : ''}
               >
                 Pessoa Jurídica
               </Button>
             </div>
           </div>
 
-          {/* Tabela */}
-          <div className="rounded-md border">
+          {/* Tabela Moderna */}
+          <div className="rounded-lg border border-gray-200 overflow-hidden">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-gray-50">
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Identificação</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Criado em</TableHead>
-                  <TableHead className="w-[50px]">Ações</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Cliente</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Tipo</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Identificação</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Contato</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Criado em</TableHead>
+                  <TableHead className="w-[50px] font-semibold text-gray-700">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredClientes.map((cliente) => (
-                  <TableRow key={cliente.id}>
+                  <TableRow key={cliente.id} className="hover:bg-gray-50 transition-colors">
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{getClienteNome(cliente)}</div>
+                      <div className="cursor-pointer group" onClick={() => router.push(`/clientes/${cliente.id}`)}>
+                        <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                          {getClienteNome(cliente)}
+                          <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
                         {cliente.tipo === 'pessoa_juridica' && cliente.razao_social && (
-                          <div className="text-sm text-muted-foreground">{cliente.razao_social}</div>
+                          <div className="text-sm text-gray-500">{cliente.razao_social}</div>
                         )}
                       </div>
                     </TableCell>
@@ -303,7 +433,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                       {getTipoBadge(cliente.tipo)}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">
+                      <div className="text-sm font-mono text-gray-600">
                         {getClienteIdentificacao(cliente)}
                       </div>
                     </TableCell>
@@ -311,14 +441,14 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                       <div className="space-y-1">
                         {cliente.email && (
                           <div className="flex items-center gap-1 text-sm">
-                            <Mail className="h-3 w-3" />
-                            {cliente.email}
+                            <Mail className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-700">{cliente.email}</span>
                           </div>
                         )}
                         {cliente.telefone && (
                           <div className="flex items-center gap-1 text-sm">
-                            <Phone className="h-3 w-3" />
-                            {cliente.telefone}
+                            <Phone className="h-3 w-3 text-gray-400" />
+                            <span className="text-gray-700">{cliente.telefone}</span>
                           </div>
                         )}
                       </div>
@@ -327,18 +457,18 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                       {getStatusBadge(cliente.status || 'ativo')}
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-gray-500">
                         {new Date(cliente.created_at).toLocaleDateString('pt-BR')}
                       </div>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-48">
                           <DropdownMenuLabel>Ações</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => router.push(`/clientes/${cliente.id}`)}>
@@ -350,10 +480,10 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(cliente.id)}
-                            className="text-red-600"
-                          >
+                                                     <DropdownMenuItem 
+                             onClick={() => handleDeleteClick(cliente.id)}
+                             className="text-red-600 focus:text-red-600"
+                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Deletar
                           </DropdownMenuItem>
@@ -367,8 +497,8 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
           </div>
 
           {/* Paginação */}
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-muted-foreground">
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-gray-500">
               Mostrando {filteredClientes.length} de {clientes.length} clientes
             </div>
           </div>
@@ -378,88 +508,111 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
       {/* Modal de Criação */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Criar Novo Cliente</h3>
             
-            <form action={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Tipo</label>
-                <select name="tipo" className="w-full border rounded-md p-2" required>
+                <Label htmlFor="tipo">Tipo *</Label>
+                <select 
+                  id="tipo"
+                  name="tipo" 
+                  value={formData.tipo}
+                  onChange={(e) => handleInputChange('tipo', e.target.value)}
+                  className="w-full border rounded-md p-2 mt-1" 
+                  required
+                >
                   <option value="pessoa_juridica">Pessoa Jurídica</option>
                   <option value="pessoa_fisica">Pessoa Física</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Nome Fantasia</label>
-                <input 
-                  type="text" 
-                  name="nome_fant" 
-                  className="w-full border rounded-md p-2"
-                  placeholder="Nome da empresa"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Nome</label>
-                <input 
+                <Label htmlFor="nome">
+                  {formData.tipo === 'pessoa_fisica' ? 'Nome Completo *' : 'Razão Social *'}
+                </Label>
+                <Input
+                  id="nome"
                   type="text" 
                   name="nome" 
-                  className="w-full border rounded-md p-2"
-                  placeholder="Nome completo"
+                  value={formData.nome}
+                  onChange={(e) => handleInputChange('nome', e.target.value)}
+                  className="mt-1"
+                  placeholder={formData.tipo === 'pessoa_fisica' ? 'Nome completo' : 'Razão social da empresa'}
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">CPF</label>
-                <input 
-                  type="text" 
-                  name="cpf" 
-                  className="w-full border rounded-md p-2"
-                  placeholder="000.000.000-00"
-                />
-              </div>
+              {formData.tipo === 'pessoa_fisica' ? (
+                <div>
+                  <Label htmlFor="cpf">CPF</Label>
+                  <MaskedInput
+                    id="cpf"
+                    name="cpf" 
+                    value={formData.cpf}
+                    onValueChange={(value) => handleInputChange('cpf', value)}
+                    className="mt-1"
+                    placeholder="000.000.000-00"
+                    mask={maskCPFCNPJ}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="cnpj">CNPJ</Label>
+                  <CNPJInput
+                    value={formData.cnpj}
+                    onChange={(value) => handleInputChange('cnpj', value)}
+                    onDataLoaded={handleCNPJDataLoaded}
+                    className="mt-1"
+                  />
+                </div>
+              )}
 
               <div>
-                <label className="block text-sm font-medium mb-1">CNPJ</label>
-                <input 
-                  type="text" 
-                  name="cnpj" 
-                  className="w-full border rounded-md p-2"
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
-                <input 
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
                   type="email" 
                   name="email" 
-                  className="w-full border rounded-md p-2"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="mt-1"
                   placeholder="contato@empresa.com"
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Telefone</label>
-                <input 
-                  type="text" 
-                  name="telefone" 
-                  className="w-full border rounded-md p-2"
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
+                                               <div>
+                    <Label htmlFor="telefone">Telefone</Label>
+                    <MaskedInput
+                      id="telefone"
+                      name="telefone"
+                      value={formData.telefone}
+                      onValueChange={(value) => handleInputChange('telefone', value)}
+                      className="mt-1"
+                      placeholder="(11) 99999-9999"
+                      mask={maskPhone}
+                    />
+                  </div>
 
               <div className="flex justify-end space-x-2 pt-4">
                 <Button 
                   type="button" 
                   variant="outline" 
                   onClick={() => setShowModal(false)}
+                  disabled={loading}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading ? 'Criando...' : 'Criar Cliente'}
+                <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Cliente'
+                  )}
                 </Button>
               </div>
             </form>
@@ -558,8 +711,23 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
+                 </DialogContent>
+       </Dialog>
+
+       {/* Modal de Confirmação de Exclusão */}
+       <ConfirmModal
+         isOpen={showDeleteModal}
+         onClose={() => {
+           setShowDeleteModal(false)
+           setClienteToDelete(null)
+         }}
+         onConfirm={handleDeleteConfirm}
+         title="Excluir Cliente"
+         description="Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita."
+         confirmText="Excluir"
+         cancelText="Cancelar"
+         variant="destructive"
+       />
+     </div>
+   )
+ }
