@@ -90,7 +90,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
   const handleCNPJDataLoaded = (data: any) => {
     setFormData(prev => ({
       ...prev,
-      nome: data.razao_social || prev.nome,
+      nome: data.nome_fantasia || data.razao_social || prev.nome,
       cnpj: data.cnpj || prev.cnpj,
       email: data.email || prev.email,
       telefone: data.telefone || prev.telefone
@@ -230,6 +230,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
 
   const getClienteNome = (cliente: Cliente) => {
     if (cliente.tipo === 'pessoa_juridica') {
+      // Priorizar nome fantasia sobre razão social para PJ
       return cliente.nome_fant || cliente.razao_social || 'Empresa sem nome'
     } else {
       return cliente.nome || 'Pessoa sem nome'
@@ -529,7 +530,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
 
               <div>
                 <Label htmlFor="nome">
-                  {formData.tipo === 'pessoa_fisica' ? 'Nome Completo *' : 'Razão Social *'}
+                  {formData.tipo === 'pessoa_fisica' ? 'Nome Completo *' : 'Nome Fantasia *'}
                 </Label>
                 <Input
                   id="nome"
@@ -538,7 +539,7 @@ export function ClientesClient({ initialData }: ClientesClientProps) {
                   value={formData.nome}
                   onChange={(e) => handleInputChange('nome', e.target.value)}
                   className="mt-1"
-                  placeholder={formData.tipo === 'pessoa_fisica' ? 'Nome completo' : 'Razão social da empresa'}
+                  placeholder={formData.tipo === 'pessoa_fisica' ? 'Nome completo' : 'Nome fantasia da empresa'}
                   required
                 />
               </div>

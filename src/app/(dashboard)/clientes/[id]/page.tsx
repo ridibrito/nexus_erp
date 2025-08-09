@@ -1,6 +1,7 @@
 import { buscarCliente } from '@/lib/api/clientes'
 import { notFound } from 'next/navigation'
 import { ClienteDetalhes } from './cliente-detalhes'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 
 interface ClientePageProps {
   params: {
@@ -15,5 +16,9 @@ export default async function ClientePage({ params }: ClientePageProps) {
     notFound()
   }
 
-  return <ClienteDetalhes cliente={result.data} />
+  return (
+    <ProtectedRoute>
+      <ClienteDetalhes cliente={result.data} />
+    </ProtectedRoute>
+  )
 }

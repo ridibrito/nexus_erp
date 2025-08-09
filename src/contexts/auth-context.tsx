@@ -1,7 +1,8 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session, AuthError } from '@supabase/supabase-js'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { User, Session } from '@supabase/supabase-js'
+import type { ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
@@ -18,7 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -41,32 +42,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 Auth state changed:', event, session?.user?.email)
+      async (event, newSession) => {
+        console.log('🔄 Auth state changed:', event, newSession?.user?.email)
         
-        // Atualizar estado apenas se realmente mudou
-        setSession(prevSession => {
-          if (prevSession?.user?.id !== session?.user?.id) {
-            return session
-          }
-          return prevSession
-        })
-        
-        setUser(prevUser => {
-          if (prevUser?.id !== session?.user?.id) {
-            return session?.user ?? null
-          }
-          return prevUser
-        })
-        
+        // Atualizar estado sempre que receber uma nova sessão
+        setSession(newSession)
+        setUser(newSession?.user ?? null)
         setLoading(false)
         
-        // Se o usuário acabou de fazer login, redirecionar apenas se não estiver já na página principal
-        if (event === 'SIGNED_IN' && session?.user && window.location.pathname !== '/') {
-          console.log('✅ Usuário logado, redirecionando...')
-          // Usar router.push em vez de window.location para evitar recarregamento
-          window.location.href = '/'
-        }
+                 // Se o usuário acabou de fazer login, redirecionar
+         if (event === 'SIGNED_IN' && newSession?.user) {
+           console.log('✅ Usuário logado, redirecionando...')
+           const currentPath = window.location.pathname
+           if (currentPath.startsWith('/auth/')) {
+             console.log('🔄 Redirecionando de rota de auth para dashboard...')
+             // Usar window.location.href para acionar o middleware
+             window.location.href = '/dashboard'
+           }
+         }
       }
     )
 
@@ -78,29 +71,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔐 Iniciando login no contexto...')
       console.log('📧 Email:', email)
       
+      // Verificar se o Supabase está configurado corretamente
+      if (!supabase.auth) {
+        console.error('❌ Supabase auth não está disponível')
+        return { success: false, error: 'Erro de configuração do Supabase' }
+      }
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      console.log('📊 Resposta do Supabase:', { data, error })
+      console.log('📊 Resposta do Supabase:', { 
+        user: data.user?.email, 
+        session: !!data.session,
+        error: error?.message 
+      })
 
       if (error) {
         console.log('❌ Erro no login:', error.message)
+        toast.error(`Erro no login: ${error.message}`)
         return { success: false, error: error.message }
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
         console.log('✅ Login bem-sucedido no contexto:', data.user.email)
-        console.log('🔑 Sessão:', data.session)
+        console.log('🔑 Sessão criada:', data.session.access_token ? 'Sim' : 'Não')
         toast.success('Login realizado com sucesso!')
+        
+        // Aguardar um pouco para garantir que a sessão foi salva
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
         return { success: true }
       }
 
-      console.log('❌ Nenhum usuário retornado do login')
+      console.log('❌ Nenhum usuário ou sessão retornado do login')
+      toast.error('Erro desconhecido no login')
       return { success: false, error: 'Erro desconhecido no login' }
     } catch (error) {
       console.log('❌ Erro inesperado no login:', error)
+      toast.error('Erro inesperado no login')
       return { success: false, error: 'Erro inesperado no login' }
     }
   }
@@ -113,7 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         options: {
-          data: userData
+          data: userData,
+          emailRedirectTo: `${window.location.origin}/auth/confirm`
         }
       })
 
@@ -141,6 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut()
+      
+      // Limpar estado imediatamente para evitar "flash" de UI
+      setUser(null)
+      setSession(null)
+      
       if (error) {
         toast.error('Erro ao fazer logout: ' + error.message)
       } else {
@@ -185,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     session,
     loading,
@@ -194,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     resetPassword,
     updatePassword,
-  }
+  }), [user, session, loading])
 
   return (
     <AuthContext.Provider value={value}>

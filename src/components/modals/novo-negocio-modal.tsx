@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -8,23 +8,28 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
 import { useClientes, usePipelines, useUsuarios } from '@/hooks/use-api'
 import { type Negocio } from '@/lib/api'
+import { pipelinesAPI } from '@/lib/api'
 import { maskCurrency, unmaskCurrency } from '@/lib/utils'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Search } from 'lucide-react'
 import { toast } from 'sonner'
-import { criarCliente } from '@/lib/actions/clientes'
+import { criarCliente as criarClienteAction } from '@/lib/actions/clientes'
 
 interface NovoNegocioModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (negocio: Omit<Negocio, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  selectedPipeline?: string
+  selectedEtapa?: string
+  currentUser?: { id: string; nome: string }
 }
 
-export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioModalProps) {
-  const { clientes, carregarClientes } = useClientes()
-  const { pipelines } = usePipelines()
-  const { usuarios } = useUsuarios()
+export function NovoNegocioModal({ open, onOpenChange, onSubmit, selectedPipeline, selectedEtapa, currentUser }: NovoNegocioModalProps) {
+  const { clientes, carregarClientes, loading: loadingClientes } = useClientes()
+  const { pipelines, loading: loadingPipelines } = usePipelines()
+  const { usuarios, loading: loadingUsuarios } = useUsuarios()
   
   const [loading, setLoading] = useState(false)
   
@@ -42,15 +47,45 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
     titulo: '',
     descricao: '',
     cliente_id: '',
-    pipeline_id: '',
-    etapa_id: '',
+    pipeline_id: selectedPipeline || '',
+    etapa_id: selectedEtapa || undefined,
     valor: '',
     probabilidade: '50',
     prioridade: 'media',
-    responsavel_id: '',
+    responsavel_id: currentUser?.id || undefined,
     proximo_contato: '',
     data_fechamento: ''
   })
+
+  // Atualizar formData quando as props mudarem
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      pipeline_id: selectedPipeline || '',
+      etapa_id: selectedEtapa || undefined,
+      responsavel_id: currentUser?.id || undefined
+    }))
+  }, [selectedPipeline, selectedEtapa, currentUser])
+
+  // Carregar etapas quando o pipeline inicial for definido
+  useEffect(() => {
+    if (selectedPipeline) {
+      getEtapasPipeline(selectedPipeline)
+    }
+  }, [selectedPipeline])
+
+  // Fechar dropdown de busca quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.cliente-search-container')) {
+        setClienteSearchOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   // Debug logs
   console.log('=== DEBUG NOVO NEGÓCIO MODAL ===')
@@ -58,6 +93,27 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
   console.log('Pipelines:', pipelines)
   console.log('Usuários:', usuarios)
   console.log('FormData:', formData)
+  
+  // Verificar se os arrays têm dados
+  console.log('Clientes length:', clientes?.length)
+  console.log('Pipelines length:', pipelines?.length)
+  console.log('Usuários length:', usuarios?.length)
+  
+  // Verificar estrutura dos primeiros itens
+  if (clientes?.length > 0) {
+    console.log('Primeiro cliente:', clientes[0])
+  }
+  if (pipelines?.length > 0) {
+    console.log('Primeiro pipeline:', pipelines[0])
+  }
+  if (usuarios?.length > 0) {
+    console.log('Primeiro usuário:', usuarios[0])
+  }
+  
+  // Verificar se os hooks estão carregando
+  console.log('Loading clientes:', loadingClientes)
+  console.log('Loading pipelines:', loadingPipelines)
+  console.log('Loading usuarios:', loadingUsuarios)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,11 +127,7 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
         return
       }
 
-      if (!formData.cliente_id) {
-        toast.error('Cliente é obrigatório')
-        setLoading(false)
-        return
-      }
+      
 
       if (!formData.pipeline_id) {
         toast.error('Pipeline é obrigatório')
@@ -83,48 +135,41 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
         return
       }
 
-      if (!formData.etapa_id) {
-        toast.error('Etapa é obrigatória')
-        setLoading(false)
-        return
-      }
+      
 
       console.log('Dados do negócio a ser criado:', {
         titulo: formData.titulo,
         descricao: formData.descricao || undefined,
-        cliente_id: formData.cliente_id,
+        cliente_id: formData.cliente_id || undefined,
         pipeline_id: formData.pipeline_id,
-        etapa_id: formData.etapa_id,
-        valor: unmaskCurrency(formData.valor) || 0,
+        etapa_id: formData.etapa_id || undefined,
+        responsavel_id: formData.responsavel_id || undefined,
+        valor: formData.valor ? unmaskCurrency(formData.valor) : undefined,
         probabilidade: parseInt(formData.probabilidade) || 50,
       })
 
-      await onSubmit({
-        titulo: formData.titulo,
-        descricao: formData.descricao || undefined,
-        cliente_id: formData.cliente_id,
-        pipeline_id: formData.pipeline_id,
-        etapa_id: formData.etapa_id,
-        valor: unmaskCurrency(formData.valor) || 0,
-        probabilidade: parseInt(formData.probabilidade) || 50,
-        // prioridade: formData.prioridade as 'baixa' | 'media' | 'alta',
-        // responsavel_id: formData.responsavel_id || undefined,
-        // proximo_contato: formData.proximo_contato || undefined,
-        // data_fechamento: formData.data_fechamento || undefined,
-        // status: 'ativo'
-      })
+             await onSubmit({
+         titulo: formData.titulo,
+         descricao: formData.descricao || undefined,
+         cliente_id: formData.cliente_id || undefined,
+         pipeline_id: formData.pipeline_id,
+         etapa_id: formData.etapa_id || undefined,
+         responsavel_id: formData.responsavel_id || undefined,
+         valor: formData.valor ? unmaskCurrency(formData.valor) : undefined,
+         probabilidade: parseInt(formData.probabilidade) || 50,
+       })
 
       // Reset form
       setFormData({
         titulo: '',
         descricao: '',
         cliente_id: '',
-        pipeline_id: '',
-        etapa_id: '',
+        pipeline_id: selectedPipeline || '',
+        etapa_id: selectedEtapa || undefined,
         valor: '',
         probabilidade: '50',
         prioridade: 'media',
-        responsavel_id: '',
+        responsavel_id: currentUser?.id || undefined,
         proximo_contato: '',
         data_fechamento: ''
       })
@@ -139,31 +184,76 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
     }
   }
 
-  const handlePipelineChange = (pipelineId: string) => {
+  const handlePipelineChange = async (pipelineId: string) => {
     setFormData(prev => ({
       ...prev,
       pipeline_id: pipelineId,
-      etapa_id: '' // Reset etapa when pipeline changes
+      etapa_id: undefined // Reset etapa when pipeline changes
     }))
-  }
-
-  const getEtapasPipeline = (pipelineId: string) => {
-    const pipeline = pipelines.find(p => p.id === pipelineId)
-    if (!pipeline) return []
     
-    // For now, we'll use mock stages. In a real app, you'd fetch stages from the API
-    return [
-      { id: 'prospeccao', nome: 'Prospecção' },
-      { id: 'qualificacao', nome: 'Qualificação' },
-      { id: 'contato', nome: 'Contato Realizado' },
-      { id: 'demo', nome: 'Demo Agendada' },
-      { id: 'proposta', nome: 'Proposta Enviada' },
-      { id: 'negociacao', nome: 'Negociação' },
-      { id: 'fechado', nome: 'Fechado' }
-    ]
+    // Buscar etapas do pipeline selecionado e definir primeira etapa
+    if (pipelineId) {
+      try {
+        const pipelineComEtapas = await pipelinesAPI.buscarComEtapas(pipelineId)
+        if (pipelineComEtapas && pipelineComEtapas.etapas.length > 0) {
+          setEtapasPipeline(pipelineComEtapas.etapas)
+          // Definir a primeira etapa automaticamente
+          const primeiraEtapa = pipelineComEtapas.etapas[0]
+          setFormData(prev => ({ 
+            ...prev, 
+            pipeline_id: pipelineId,
+            etapa_id: primeiraEtapa.id 
+          }))
+        } else {
+          setEtapasPipeline([])
+        }
+      } catch (error) {
+        console.error('Erro ao buscar etapas do pipeline:', error)
+        setEtapasPipeline([])
+      }
+    }
   }
 
-  const criarCliente = async () => {
+  const [etapasPipeline, setEtapasPipeline] = useState<any[]>([])
+  const [clienteSearchOpen, setClienteSearchOpen] = useState(false)
+  const [clienteSearchTerm, setClienteSearchTerm] = useState('')
+
+  const getEtapasPipeline = async (pipelineId: string) => {
+    try {
+      console.log('Buscando etapas para pipeline:', pipelineId)
+      const pipelineComEtapas = await pipelinesAPI.buscarComEtapas(pipelineId)
+      if (pipelineComEtapas && pipelineComEtapas.etapas.length > 0) {
+        console.log('Etapas encontradas:', pipelineComEtapas.etapas)
+        setEtapasPipeline(pipelineComEtapas.etapas)
+        
+        // Definir a primeira etapa como padrão se não houver etapa selecionada
+        if (!formData.etapa_id) {
+          const primeiraEtapa = pipelineComEtapas.etapas[0]
+          setFormData(prev => ({ ...prev, etapa_id: primeiraEtapa.id }))
+        }
+      } else {
+        console.log('Pipeline não encontrado ou sem etapas')
+        setEtapasPipeline([])
+      }
+    } catch (error) {
+      console.error('Erro ao buscar etapas do pipeline:', error)
+      setEtapasPipeline([])
+    }
+  }
+
+  // Filtrar clientes baseado no termo de busca
+  const filteredClientes = clientes?.filter(cliente => {
+    const searchTerm = clienteSearchTerm.toLowerCase()
+    const nomeFant = cliente.nome_fant?.toLowerCase() || ''
+    const razaoSocial = cliente.razao_social?.toLowerCase() || ''
+    const nome = cliente.nome?.toLowerCase() || ''
+    
+    return nomeFant.includes(searchTerm) || 
+           razaoSocial.includes(searchTerm) || 
+           nome.includes(searchTerm)
+  }) || []
+
+  const handleCriarCliente = async () => {
     try {
       console.log('=== INICIANDO criarCliente ===')
       console.log('Dados do cliente:', clienteData)
@@ -181,7 +271,7 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
       formData.append('tipo', 'pessoa_juridica')
       formData.append('telefone', clienteData.telefone || '')
 
-      const result = await criarCliente(formData)
+      const result = await criarClienteAction(formData)
       if (result.success) {
         const novoCliente = result.data
         console.log('Cliente criado com sucesso:', novoCliente)
@@ -221,11 +311,18 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl" style={{ zIndex: 9999 }}>
-          <DialogHeader>
-            <DialogTitle>Novo Negócio</DialogTitle>
-          </DialogHeader>
+                    {open && (
+         <div className="fixed inset-0 z-[9998] bg-black bg-opacity-50 flex items-center justify-center">
+           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" style={{ zIndex: 10001 }}>
+             <div className="flex justify-between items-center mb-6">
+               <h2 className="text-lg font-semibold">Novo Negócio</h2>
+               <button
+                 onClick={() => onOpenChange(false)}
+                 className="text-gray-400 hover:text-gray-600"
+               >
+                 ✕
+               </button>
+             </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
@@ -240,42 +337,77 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="cliente">Cliente *</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={formData.cliente_id}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, cliente_id: value }))}
-                    required
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecione um cliente" />
-                    </SelectTrigger>
-                                      <SelectContent>
-                    {clientes.length === 0 ? (
-                      <SelectItem value="" disabled>
-                        Nenhum cliente encontrado
-                      </SelectItem>
-                    ) : (
-                      clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.nome_fant || cliente.nome || 'Cliente sem nome'}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowClienteModal(true)}
-                    className="shrink-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                             <div className="space-y-2">
+                 <Label htmlFor="cliente">Cliente</Label>
+                 <div className="flex gap-2">
+                   <div className="flex-1 relative cliente-search-container">
+                     <div className="relative">
+                       <Input
+                         placeholder="Buscar cliente..."
+                         value={clienteSearchTerm}
+                         onChange={(e) => setClienteSearchTerm(e.target.value)}
+                         onFocus={() => setClienteSearchOpen(true)}
+                         className="pr-10"
+                       />
+                       <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                     </div>
+                     
+                     {clienteSearchOpen && (
+                       <div className="absolute z-[10003] w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                         {loadingClientes ? (
+                           <div className="p-2 text-sm text-gray-500">Carregando clientes...</div>
+                         ) : filteredClientes.length > 0 ? (
+                           <div>
+                             {filteredClientes.map((cliente) => (
+                               <button
+                                 key={cliente.id}
+                                 type="button"
+                                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                                 onClick={() => {
+                                   setFormData(prev => ({ ...prev, cliente_id: cliente.id }))
+                                   setClienteSearchTerm(cliente.nome_fant || cliente.razao_social || cliente.nome || '')
+                                   setClienteSearchOpen(false)
+                                 }}
+                               >
+                                 <div className="font-medium">
+                                   {cliente.nome_fant || cliente.razao_social || cliente.nome}
+                                 </div>
+                                 {cliente.razao_social && cliente.nome_fant !== cliente.razao_social && (
+                                   <div className="text-xs text-gray-500">
+                                     {cliente.razao_social}
+                                   </div>
+                                 )}
+                               </button>
+                             ))}
+                           </div>
+                         ) : (
+                           <div className="p-2 text-sm text-gray-500">
+                             {clienteSearchTerm ? 'Nenhum cliente encontrado' : 'Digite para buscar clientes'}
+                           </div>
+                         )}
+                       </div>
+                     )}
+                   </div>
+                   <Button
+                     type="button"
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setShowClienteModal(true)}
+                     className="shrink-0"
+                   >
+                     <Plus className="h-4 w-4" />
+                   </Button>
+                 </div>
+                 
+                 {/* Mostrar cliente selecionado */}
+                 {formData.cliente_id && (
+                   <div className="text-sm text-gray-600 mt-1">
+                     Cliente selecionado: {clientes?.find(c => c.id === formData.cliente_id)?.nome_fant || 
+                                        clientes?.find(c => c.id === formData.cliente_id)?.razao_social || 
+                                        clientes?.find(c => c.id === formData.cliente_id)?.nome || 'Cliente não encontrado'}
+                   </div>
+                 )}
+               </div>
             </div>
 
             <div className="space-y-2">
@@ -294,45 +426,67 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                 <Label htmlFor="pipeline">Pipeline *</Label>
                 <Select
                   value={formData.pipeline_id}
-                  onValueChange={handlePipelineChange}
+                  onValueChange={(value) => {
+                    console.log('Pipeline selecionado:', value)
+                    handlePipelineChange(value)
+                  }}
                   required
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um pipeline" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pipelines.map((pipeline) => (
-                      <SelectItem key={pipeline.id} value={pipeline.id}>
-                        {pipeline.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                                     <SelectTrigger>
+                     <SelectValue placeholder="Selecione um pipeline" />
+                   </SelectTrigger>
+                   <SelectContent className="z-[10003]">
+                     {loadingPipelines ? (
+                       <SelectItem value="loading" disabled>
+                         Carregando pipelines...
+                       </SelectItem>
+                     ) : pipelines && pipelines.length > 0 ? (
+                       pipelines.map((pipeline) => (
+                         <SelectItem key={pipeline.id} value={pipeline.id}>
+                           {pipeline.nome}
+                         </SelectItem>
+                       ))
+                     ) : (
+                       <SelectItem value="no-pipelines" disabled>
+                         Nenhum pipeline encontrado
+                       </SelectItem>
+                     )}
+                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="etapa">Etapa *</Label>
+                                 <Label htmlFor="etapa">Etapa</Label>
                 <Select
-                  value={formData.etapa_id}
+                  value={formData.etapa_id || ''}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, etapa_id: value }))}
-                  required
-                  disabled={!formData.pipeline_id}
+                                     disabled={!formData.pipeline_id}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma etapa" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {formData.pipeline_id && getEtapasPipeline(formData.pipeline_id).map((etapa) => (
-                      <SelectItem key={etapa.id} value={etapa.id}>
-                        {etapa.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                                                                                                                                                                          <SelectContent className="z-[10003]">
+                     {!formData.pipeline_id ? (
+                       <SelectItem value="no-pipeline-selected" disabled>
+                         Selecione um pipeline primeiro
+                       </SelectItem>
+                     ) : etapasPipeline.length > 0 ? (
+                       etapasPipeline.map((etapa) => (
+                         <SelectItem key={etapa.id} value={etapa.id}>
+                           {etapa.nome}
+                         </SelectItem>
+                       ))
+                     ) : (
+                       <SelectItem value="no-etapas" disabled>
+                         Nenhuma etapa encontrada
+                       </SelectItem>
+                     )}
+                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="valor">Valor (R$) *</Label>
+                             <div className="space-y-2">
+                 <Label htmlFor="valor">Valor (R$)</Label>
                 <Input
                   id="valor"
                   type="text"
@@ -341,8 +495,7 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                     const maskedValue = maskCurrency(e.target.value)
                     setFormData(prev => ({ ...prev, valor: maskedValue }))
                   }}
-                  placeholder="R$ 0,00"
-                  required
+                                     placeholder="R$ 0,00"
                 />
               </div>
             </div>
@@ -357,13 +510,13 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10%</SelectItem>
-                    <SelectItem value="25">25%</SelectItem>
-                    <SelectItem value="50">50%</SelectItem>
-                    <SelectItem value="75">75%</SelectItem>
-                    <SelectItem value="90">90%</SelectItem>
-                  </SelectContent>
+                                                                                                                                                       <SelectContent className="z-[10003]">
+                       <SelectItem value="10">10%</SelectItem>
+                       <SelectItem value="25">25%</SelectItem>
+                       <SelectItem value="50">50%</SelectItem>
+                       <SelectItem value="75">75%</SelectItem>
+                       <SelectItem value="90">90%</SelectItem>
+                     </SelectContent>
                 </Select>
               </div>
 
@@ -376,30 +529,40 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="baixa">Baixa</SelectItem>
-                    <SelectItem value="media">Média</SelectItem>
-                    <SelectItem value="alta">Alta</SelectItem>
-                  </SelectContent>
+                                                                                                                                                       <SelectContent className="z-[10003]">
+                       <SelectItem value="baixa">Baixa</SelectItem>
+                       <SelectItem value="media">Média</SelectItem>
+                       <SelectItem value="alta">Alta</SelectItem>
+                     </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="responsavel">Responsável</Label>
                 <Select
-                  value={formData.responsavel_id}
+                  value={formData.responsavel_id || ''}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, responsavel_id: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um responsável" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {usuarios.map((usuario) => (
-                      <SelectItem key={usuario.id} value={usuario.id}>
-                        {usuario.nome || usuario.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                                                                                                                                                                          <SelectContent className="z-[10003]">
+                     {loadingUsuarios ? (
+                       <SelectItem value="loading" disabled>
+                         Carregando usuários...
+                       </SelectItem>
+                     ) : usuarios && usuarios.length > 0 ? (
+                       usuarios.map((usuario) => (
+                         <SelectItem key={usuario.id} value={usuario.id}>
+                           {usuario.nome}
+                         </SelectItem>
+                       ))
+                     ) : (
+                       <SelectItem value="no-users" disabled>
+                         Nenhum usuário encontrado
+                       </SelectItem>
+                     )}
+                   </SelectContent>
                 </Select>
               </div>
             </div>
@@ -438,14 +601,15 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
               <Button type="submit" disabled={loading}>
                 {loading ? 'Criando...' : 'Criar Negócio'}
               </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+                         </div>
+           </form>
+         </div>
+       </div>
+       )}
 
       {/* Modal de Criar Cliente - Renderizado via Portal */}
       {showClienteModal && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[99999]">
+                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10003]">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Criar Novo Cliente</h3>
             
@@ -523,7 +687,7 @@ export function NovoNegocioModal({ open, onOpenChange, onSubmit }: NovoNegocioMo
               </Button>
               <Button 
                 className="flex-1"
-                onClick={criarCliente}
+                onClick={handleCriarCliente}
                 disabled={savingCliente || !clienteData.nome_fant}
               >
                 {savingCliente ? (

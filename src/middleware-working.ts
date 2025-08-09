@@ -70,18 +70,12 @@ export async function middleware(req: NextRequest) {
   const supabaseCookies = req.cookies.getAll().filter(c => c.name.includes('sb-'))
   console.log('🔍 Middleware - Supabase Cookies:', supabaseCookies.map(c => c.name))
   
+  // Obter sessão
   const { data: { session } } = await supabase.auth.getSession()
   
   console.log('🔍 Middleware - Sessão:', session ? 'Autenticado' : 'Não autenticado')
   console.log('🔍 Middleware - Session User:', session?.user?.email)
   console.log('🔍 Middleware - Session User ID:', session?.user?.id)
-  
-  // Debug adicional
-  if (!session) {
-    console.log('🔍 Middleware - Erro: Sessão não encontrada mesmo com cookies')
-    console.log('🔍 Middleware - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
-    console.log('🔍 Middleware - Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Presente' : 'Ausente')
-  }
 
   // Se não está autenticado e tentando acessar rota protegida
   if (!session?.user && isProtected) {

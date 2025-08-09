@@ -23,7 +23,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react'
-import { MemberAvatarUpload } from '@/components/ui/member-avatar-upload'
+import { UserAvatarUpload } from '@/components/ui/user-avatar-upload'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,8 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditarEtapasModal } from '@/components/modals/editar-etapas-modal'
 import { pipelinesAPI } from '@/lib/api'
+import { usuariosAPI } from '@/lib/api/usuarios'
+import { atualizarUsuario, alterarStatusUsuario, UsuarioComPerfil } from '@/lib/actions/usuarios'
 
 // Componentes de conteúdo para cada seção
 const EmpresaContent = () => {
@@ -393,11 +395,11 @@ const EmpresaContent = () => {
 
 const UsuariosContent = () => {
   const [activeTab, setActiveTab] = useState('lista')
-  const [usuarios, setUsuarios] = useState<any[]>([])
+  const [usuarios, setUsuarios] = useState<UsuarioComPerfil[]>([])
   const [loading, setLoading] = useState(false)
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<any>(null)
+  const [editingUser, setEditingUser] = useState<UsuarioComPerfil | null>(null)
 
   // Estados para novo usuário
   const [newUser, setNewUser] = useState({
@@ -429,7 +431,7 @@ const UsuariosContent = () => {
       if (usuario?.empresa_id) {
         setEmpresaId(usuario.empresa_id)
         
-        // Carregar todos os usuários da empresa
+        // Buscar usuários da empresa
         const { data: usuariosData, error } = await supabase
           .from('usuarios')
           .select('*')
@@ -438,7 +440,29 @@ const UsuariosContent = () => {
           .order('nome')
 
         if (error) throw error
-        setUsuarios(usuariosData || [])
+
+        // Enriquecer dados com informações de perfil
+        const usuariosComPerfil = (usuariosData || []).map(usuario => {
+          // Se for o usuário atual, usar dados da sessão
+          if (usuario.auth_user_id === user.id) {
+            return {
+              ...usuario,
+              avatar_url: user.user_metadata?.avatar_url || usuario.avatar_url || null,
+              name: user.user_metadata?.name || usuario.nome,
+              email: user.email || usuario.email
+            }
+          } else {
+            // Para outros usuários, usar dados da tabela
+            return {
+              ...usuario,
+              avatar_url: usuario.avatar_url || null,
+              name: usuario.nome,
+              email: usuario.email
+            }
+          }
+        })
+
+        setUsuarios(usuariosComPerfil)
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error)
@@ -450,18 +474,16 @@ const UsuariosContent = () => {
 
   const toggleStatusUsuario = async (usuarioId: string, novoStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('usuarios')
-        .update({ is_active: novoStatus })
-        .eq('id', usuarioId)
-
-      if (error) throw error
-
-      setUsuarios(prev => prev.map(u => 
-        u.id === usuarioId ? { ...u, is_active: novoStatus } : u
-      ))
-
-      toast.success(`Usuário ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`)
+      const result = await alterarStatusUsuario(usuarioId, novoStatus)
+      
+      if (result.success) {
+        setUsuarios(prev => prev.map(u => 
+          u.id === usuarioId ? { ...u, is_active: novoStatus } : u
+        ))
+        toast.success(`Usuário ${novoStatus ? 'ativado' : 'desativado'} com sucesso!`)
+      } else {
+        toast.error(result.error || 'Erro ao alterar status do usuário')
+      }
     } catch (error) {
       console.error('Erro ao alterar status:', error)
       toast.error('Erro ao alterar status do usuário')
@@ -498,21 +520,19 @@ const UsuariosContent = () => {
     }
   }
 
-  const editarUsuario = async (usuarioId: string, dados: any) => {
+  const editarUsuario = async (usuarioId: string, dados: Partial<UsuarioComPerfil>) => {
     try {
-      const { error } = await supabase
-        .from('usuarios')
-        .update(dados)
-        .eq('id', usuarioId)
-
-      if (error) throw error
-
-      setUsuarios(prev => prev.map(u => 
-        u.id === usuarioId ? { ...u, ...dados } : u
-      ))
-
-      toast.success('Usuário atualizado com sucesso!')
-      setEditingUser(null)
+      const result = await atualizarUsuario(usuarioId, dados)
+      
+      if (result.success) {
+        setUsuarios(prev => prev.map(u => 
+          u.id === usuarioId ? { ...u, ...dados } : u
+        ))
+        toast.success('Usuário atualizado com sucesso!')
+        setEditingUser(null)
+      } else {
+        toast.error(result.error || 'Erro ao editar usuário')
+      }
     } catch (error) {
       console.error('Erro ao editar usuário:', error)
       toast.error('Erro ao editar usuário')
@@ -635,8 +655,8 @@ const UsuariosContent = () => {
                 {usuarios.map((usuario) => (
                   <div key={usuario.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                     <div className="flex items-center gap-4">
-                      <MemberAvatarUpload
-                        memberId={usuario.id}
+                      <UserAvatarUpload
+                        userId={usuario.id}
                         currentAvatarUrl={usuario.avatar_url}
                         size="md"
                         onAvatarChange={(url) => {
@@ -646,7 +666,7 @@ const UsuariosContent = () => {
                         }}
                       />
                       <div>
-                        <h3 className="font-medium text-gray-900">{usuario.nome}</h3>
+                        <h3 className="font-medium text-gray-900">{usuario.name || usuario.nome}</h3>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
                           <Mail className="h-4 w-4" />
                           {usuario.email}
@@ -702,8 +722,8 @@ const UsuariosContent = () => {
               {usuarios.map((usuario) => (
                 <div key={usuario.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div className="flex items-center gap-4">
-                    <MemberAvatarUpload
-                      memberId={usuario.id}
+                    <UserAvatarUpload
+                      userId={usuario.id}
                       currentAvatarUrl={usuario.avatar_url}
                       size="md"
                       onAvatarChange={(url) => {
@@ -713,7 +733,7 @@ const UsuariosContent = () => {
                       }}
                     />
                     <div>
-                      <h3 className="font-medium text-gray-900">{usuario.nome}</h3>
+                      <h3 className="font-medium text-gray-900">{usuario.name || usuario.nome}</h3>
                       <p className="text-sm text-gray-500">{usuario.cargo}</p>
                     </div>
                   </div>
@@ -805,8 +825,8 @@ const UsuariosContent = () => {
             
             <div className="space-y-4">
               <div className="flex justify-center mb-4">
-                <MemberAvatarUpload
-                  memberId="new-user"
+                <UserAvatarUpload
+                  userId="new-user"
                   size="lg"
                   onAvatarChange={(url) => {
                     // O avatar será salvo quando o usuário for criado
@@ -899,8 +919,8 @@ const UsuariosContent = () => {
             
             <div className="space-y-4">
               <div className="flex justify-center mb-4">
-                <MemberAvatarUpload
-                  memberId={editingUser.id}
+                <UserAvatarUpload
+                  userId={editingUser.id}
                   currentAvatarUrl={editingUser.avatar_url}
                   size="lg"
                   onAvatarChange={(url) => {
@@ -915,7 +935,7 @@ const UsuariosContent = () => {
                 </label>
                 <input
                   type="text"
-                  value={editingUser.nome}
+                  value={editingUser.name || editingUser.nome}
                   onChange={(e) => setEditingUser({ ...editingUser, nome: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 />
@@ -964,7 +984,12 @@ const UsuariosContent = () => {
             
             <div className="flex gap-3 mt-6">
               <Button
-                onClick={() => editarUsuario(editingUser.id, editingUser)}
+                onClick={() => editarUsuario(editingUser.id, {
+                  nome: editingUser.nome,
+                  email: editingUser.email,
+                  cargo: editingUser.cargo,
+                  telefone: editingUser.telefone
+                })}
                 className="flex-1"
               >
                 Salvar

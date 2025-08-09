@@ -10,7 +10,7 @@ import { CNPJInput } from '@/components/ui/cnpj-input'
 import { maskPhone, maskCPFCNPJ, validateCPF, validateCNPJ, removeMask } from '@/lib/utils'
 import { criarCliente } from '@/lib/actions/clientes'
 import { testClientesAPI } from '@/lib/api/test-clientes'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
 import { Loader2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -25,6 +25,7 @@ export default function NovoClientePage() {
     nome: '',
     cpf: '',
     cnpj: '',
+    razao_social: '',
     email: '',
     telefone: '',
     cep: '',
@@ -54,7 +55,8 @@ export default function NovoClientePage() {
   const handleCNPJDataLoaded = (data: any) => {
     setFormData(prev => ({
       ...prev,
-      nome: data.razao_social || prev.nome,
+      nome: data.nome_fantasia || prev.nome,
+      razao_social: data.razao_social || prev.razao_social,
       cnpj: data.cnpj || prev.cnpj,
       email: data.email || prev.email,
       telefone: data.telefone || prev.telefone,
@@ -68,10 +70,6 @@ export default function NovoClientePage() {
   const validateForm = () => {
     if (!formData.nome.trim()) {
       toast.error('Nome é obrigatório')
-      return false
-    }
-    if (!formData.email.trim()) {
-      toast.error('Email é obrigatório')
       return false
     }
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
@@ -107,6 +105,9 @@ export default function NovoClientePage() {
         formDataToSend.append('cpf', formData.cpf)
       } else {
         formDataToSend.append('cnpj', formData.cnpj)
+        if (formData.razao_social) {
+          formDataToSend.append('razao_social', formData.razao_social)
+        }
       }
 
       // Adicionar endereço como JSON se preenchido
@@ -149,7 +150,7 @@ export default function NovoClientePage() {
           <h1 className="text-2xl font-bold">Novo Cliente</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="tipo">Tipo *</Label>
@@ -168,7 +169,7 @@ export default function NovoClientePage() {
 
             <div>
               <Label htmlFor="nome">
-                {formData.tipo === 'pessoa_fisica' ? 'Nome Completo *' : 'Razão Social *'}
+                {formData.tipo === 'pessoa_fisica' ? 'Nome Completo *' : 'Nome Fantasia *'}
               </Label>
               <Input
                 id="nome"
@@ -177,10 +178,25 @@ export default function NovoClientePage() {
                 value={formData.nome}
                 onChange={(e) => handleInputChange('nome', e.target.value)}
                 className="mt-1"
-                placeholder={formData.tipo === 'pessoa_fisica' ? 'Nome completo' : 'Razão social da empresa'}
+                placeholder={formData.tipo === 'pessoa_fisica' ? 'Nome completo' : 'Nome fantasia da empresa'}
                 required
               />
             </div>
+
+            {formData.tipo === 'pessoa_juridica' && (
+              <div>
+                <Label htmlFor="razao_social">Razão Social</Label>
+                <Input
+                  id="razao_social"
+                  type="text" 
+                  name="razao_social" 
+                  value={formData.razao_social || ''}
+                  onChange={(e) => handleInputChange('razao_social', e.target.value)}
+                  className="mt-1"
+                  placeholder="Razão social da empresa"
+                />
+              </div>
+            )}
 
             {formData.tipo === 'pessoa_fisica' ? (
               <div>
@@ -208,16 +224,15 @@ export default function NovoClientePage() {
             )}
 
             <div>
-              <Label htmlFor="email">Email *</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                type="email" 
+                type="text" 
                 name="email" 
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 className="mt-1"
                 placeholder="contato@empresa.com"
-                required
               />
             </div>
 
@@ -231,6 +246,7 @@ export default function NovoClientePage() {
                 className="mt-1"
                 placeholder="(11) 99999-9999"
                 mask={maskPhone}
+                required={false}
               />
             </div>
 

@@ -13,6 +13,12 @@ import { InlineAddressEdit } from '@/components/ui/inline-address-edit'
 import { ResponsavelSelect } from '@/components/ui/responsavel-select'
 import { CNPJInput } from '@/components/ui/cnpj-input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   ArrowLeft, 
   Edit, 
@@ -50,11 +56,17 @@ import { toast } from 'sonner'
 import { 
   deletarCliente, 
   vincularPessoaEmpresa, 
+  vincularPessoaEmpresaSimples,
+  vincularPessoaEmpresaNova,
+  vincularPessoaEmpresaBypassRLS,
+  vincularPessoaEmpresaFinal,
   buscarVinculacoes, 
   criarNegocio, 
   buscarNegocios,
   buscarClientesParaVincular,
-  atualizarClienteDetalhes
+  atualizarClienteDetalhes,
+  criarCliente,
+  vincularPessoaEmpresaAlternativo
 } from '@/lib/actions/clientes'
 
 interface ClienteDetalhesProps {
@@ -86,27 +98,29 @@ interface Negocio {
 export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('timeline')
-  const [expandedSections, setExpandedSections] = useState({
-    basicData: true,
-    location: true,
-    otherInfo: true
-  })
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showVinculacaoModal, setShowVinculacaoModal] = useState(false)
   const [showNegocioModal, setShowNegocioModal] = useState(false)
-  const [vinculacoes, setVinculacoes] = useState<Vinculacao[]>([])
-  const [negocios, setNegocios] = useState<Negocio[]>([])
-  const [loadingVinculacoes, setLoadingVinculacoes] = useState(false)
-  const [loadingNegocios, setLoadingNegocios] = useState(false)
+  const [showCriarClienteModal, setShowCriarClienteModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedVinculacao, setSelectedVinculacao] = useState<string>('')
+  const [selectedVinculacao, setSelectedVinculacao] = useState('')
   const [clientesParaVincular, setClientesParaVincular] = useState<Cliente[]>([])
   const [loadingClientes, setLoadingClientes] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [loadingVinculacoes, setLoadingVinculacoes] = useState(false)
+  const [loadingNegocios, setLoadingNegocios] = useState(false)
+  const [vinculacoes, setVinculacoes] = useState<Vinculacao[]>([])
+  const [negocios, setNegocios] = useState<Negocio[]>([])
+  const [expandedSections, setExpandedSections] = useState({
+    basicData: true,
+    location: false,
+    otherInfo: false
+  })
+  const [activeTab, setActiveTab] = useState('timeline')
 
 
   const getClienteNome = (cliente: Cliente) => {
     if (cliente.tipo === 'pessoa_juridica') {
+      // Priorizar nome fantasia sobre razão social para PJ
       return cliente.nome_fant || cliente.razao_social || 'Empresa sem nome'
     } else {
       return cliente.nome || 'Pessoa sem nome'
@@ -250,7 +264,7 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
     try {
       // Lógica inversa: PJ vincula pessoas, PF vincula empresas
       const tipo = cliente.tipo === 'pessoa_juridica' ? 'pessoa' : 'empresa'
-      const result = await vincularPessoaEmpresa(cliente.id, selectedVinculacao, tipo)
+      const result = await vincularPessoaEmpresaFinal(cliente.id, selectedVinculacao, tipo)
       
       if (result.success) {
         toast.success('Vinculação criada com sucesso!')
@@ -264,6 +278,41 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
       }
     } catch (error) {
       toast.error('Erro ao vincular')
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCriarClienteEVincular = async (formData: FormData) => {
+    setLoading(true)
+    try {
+      // Criar o novo cliente
+      const result = await criarCliente(formData)
+      
+      if (result.success) {
+        // Vincular automaticamente o cliente recém-criado
+        const tipo = cliente.tipo === 'pessoa_juridica' ? 'pessoa' : 'empresa'
+        
+        // Usar a função de vinculação simples
+        const vinculacaoResult = await vincularPessoaEmpresaFinal(cliente.id, result.data.id, tipo)
+        
+        if (vinculacaoResult.success) {
+          toast.success('Cliente criado e vinculado com sucesso!')
+          setShowCriarClienteModal(false)
+          setShowVinculacaoModal(false)
+          setSearchTerm('')
+          setSelectedVinculacao('')
+          setClientesParaVincular([])
+          carregarVinculacoes()
+        } else {
+          toast.error('Cliente criado mas erro ao vincular: ' + vinculacaoResult.error)
+        }
+      } else {
+        toast.error(result.error || 'Erro ao criar cliente')
+      }
+    } catch (error) {
+      toast.error('Erro ao criar cliente')
       console.error(error)
     } finally {
       setLoading(false)
@@ -386,17 +435,36 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
     // Atualizar automaticamente os campos com dados da Receita Federal
     const updates = []
     
-    if (data.razao_social) {
-      updates.push(handleInlineEdit('razao_social', data.razao_social))
-    }
+    // Priorizar nome fantasia sobre razão social
     if (data.nome_fantasia) {
+      console.log('Aplicando nome fantasia:', data.nome_fantasia)
       updates.push(handleInlineEdit('nome_fant', data.nome_fantasia))
+    } else {
+      console.log('Nome fantasia não encontrado nos dados')
     }
+    
+    // Depois atualizar razão social
+    if (data.razao_social) {
+      console.log('Aplicando razão social:', data.razao_social)
+      updates.push(handleInlineEdit('razao_social', data.razao_social))
+    } else {
+      console.log('Razão social não encontrada nos dados')
+    }
+    
     if (data.email) {
+      console.log('Aplicando email:', data.email)
       updates.push(handleInlineEdit('email', data.email))
+    } else {
+      console.log('Email não encontrado nos dados')
     }
-    if (data.telefone) {
-      updates.push(handleInlineEdit('telefone', data.telefone))
+    
+    // Telefone pode vir em diferentes campos
+    const telefone = data.ddd_telefone_1 || data.telefone
+    if (telefone) {
+      console.log('Aplicando telefone:', telefone)
+      updates.push(handleInlineEdit('telefone', telefone))
+    } else {
+      console.log('Telefone não encontrado nos dados')
     }
     
     // Atualizar endereço se houver dados
@@ -412,17 +480,25 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
       }
       console.log('Endereço formatado:', enderecoFormatado)
       updates.push(handleEnderecoChange(enderecoFormatado))
+    } else {
+      console.log('Nenhum dado de endereço encontrado')
     }
     
     // Executar todas as atualizações
     if (updates.length > 0) {
+      console.log('Executando atualizações:', updates.length)
       Promise.all(updates).then(() => {
         toast.success('Dados da Receita Federal aplicados com sucesso!')
+        // Recarregar a página para mostrar os dados atualizados
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       }).catch((error) => {
         console.error('Erro ao aplicar dados da RF:', error)
         toast.error('Erro ao aplicar alguns dados da Receita Federal')
       })
     } else {
+      console.log('Nenhuma atualização para executar')
       toast.info('Nenhum dado da Receita Federal foi aplicado')
     }
   }
@@ -437,7 +513,10 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
 
   useEffect(() => {
     if (showVinculacaoModal) {
-      buscarClientes()
+      // Limpar a lista quando o modal abrir, mas não buscar automaticamente
+      setClientesParaVincular([])
+      setSearchTerm('')
+      setSelectedVinculacao('')
     }
   }, [showVinculacaoModal])
 
@@ -455,21 +534,34 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header da Sidebar */}
         <div className="p-6 border-b border-gray-200">
-                      <div className="flex items-center space-x-3 mb-4">
-              <AvatarUpload
-                currentAvatar={cliente.avatar}
-                onAvatarChange={handleAvatarChange}
-                size="md"
+          <div className="flex items-center space-x-3 mb-4">
+            <AvatarUpload
+              currentAvatar={cliente.avatar}
+              onAvatarChange={handleAvatarChange}
+              size="md"
+            />
+            <div className="flex-1">
+              <InlineEdit
+                value={getClienteNome(cliente)}
+                onSave={(value) => handleInlineEdit(cliente.tipo === 'pessoa_fisica' ? 'nome' : 'nome_fant', value)}
+                placeholder={cliente.tipo === 'pessoa_fisica' ? 'Nome do cliente' : 'Nome fantasia'}
+                className="font-semibold text-gray-900 text-lg"
               />
-              <div className="flex-1">
-                <InlineEdit
-                  value={getClienteNome(cliente)}
-                  onSave={(value) => handleInlineEdit(cliente.tipo === 'pessoa_fisica' ? 'nome' : 'razao_social', value)}
-                  placeholder="Nome do cliente"
-                  className="font-semibold text-gray-900 text-lg"
-                />
-              </div>
             </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600 focus:text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir Cliente
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {/* Conteúdo da Sidebar */}
@@ -489,21 +581,23 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
             {expandedSections.basicData && (
               <div className="space-y-3 ml-6">
                 <div>
-                  <label className="text-xs text-gray-500">Nome</label>
+                  <label className="text-xs text-gray-500">
+                    {cliente.tipo === 'pessoa_fisica' ? 'Nome' : 'Nome Fantasia'}
+                  </label>
                   <InlineEdit
                     value={getClienteNome(cliente)}
-                    onSave={(value) => handleInlineEdit(cliente.tipo === 'pessoa_fisica' ? 'nome' : 'razao_social', value)}
-                    placeholder="Nome do cliente"
+                    onSave={(value) => handleInlineEdit(cliente.tipo === 'pessoa_fisica' ? 'nome' : 'nome_fant', value)}
+                    placeholder={cliente.tipo === 'pessoa_fisica' ? 'Nome do cliente' : 'Nome fantasia'}
                     className="text-sm text-gray-900"
                   />
                 </div>
                 {cliente.tipo === 'pessoa_juridica' && (
                   <div>
-                    <label className="text-xs text-gray-500">Nome Fantasia</label>
+                    <label className="text-xs text-gray-500">Razão Social</label>
                     <InlineEdit
-                      value={cliente.nome_fant || ''}
-                      onSave={(value) => handleInlineEdit('nome_fant', value)}
-                      placeholder="Nome fantasia"
+                      value={cliente.razao_social || ''}
+                      onSave={(value) => handleInlineEdit('razao_social', value)}
+                      placeholder="Razão social"
                       className="text-sm text-gray-900"
                     />
                   </div>
@@ -654,26 +748,7 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                 </button>
               ))}
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/clientes')}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteClick}
-                className="text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Excluir Cliente
-              </Button>
-            </div>
+
           </div>
         </div>
 
@@ -809,8 +884,8 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
 
                       {/* Entrada 2 */}
                       <div className="relative flex items-start space-x-4">
-                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <Mail className="h-6 w-6 text-blue-600" />
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
+                          <Mail className="h-6 w-6 text-gray-600" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
@@ -890,11 +965,11 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                       {vinculacoes.map((vinculacao) => (
                         <div key={vinculacao.id} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-gray-200">
                               {vinculacao.vinculado.tipo === 'pessoa_juridica' ? (
-                                <Building2 className="h-5 w-5 text-blue-600" />
+                                <Building2 className="h-5 w-5 text-gray-600" />
                               ) : (
-                                <User className="h-5 w-5 text-blue-600" />
+                                <User className="h-5 w-5 text-gray-600" />
                               )}
                             </div>
                             <div>
@@ -1076,11 +1151,18 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                     className="pl-10"
                     value={searchTerm}
                     onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      if (e.target.value.length >= 2) {
-                        buscarClientes(e.target.value)
-                      } else if (e.target.value.length === 0) {
-                        buscarClientes()
+                      const value = e.target.value
+                      setSearchTerm(value)
+                      
+                      // Limpar resultados se o campo estiver vazio
+                      if (value.length === 0) {
+                        setClientesParaVincular([])
+                        return
+                      }
+                      
+                      // Buscar apenas se tiver pelo menos 2 caracteres
+                      if (value.length >= 2) {
+                        buscarClientes(value)
                       }
                     }}
                   />
@@ -1104,11 +1186,11 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-gray-200">
                             {clienteOpcao.tipo === 'pessoa_juridica' ? (
-                              <Building2 className="h-4 w-4 text-blue-600" />
+                              <Building2 className="h-4 w-4 text-gray-600" />
                             ) : (
-                              <User className="h-4 w-4 text-blue-600" />
+                              <User className="h-4 w-4 text-gray-600" />
                             )}
                           </div>
                           <div className="flex-1">
@@ -1128,7 +1210,27 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                   </div>
                 ) : (
                   <div className="p-4 text-center text-gray-500">
-                    {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum cliente disponível'}
+                    {searchTerm ? (
+                      <div className="space-y-4">
+                        <p>Nenhum resultado encontrado para "{searchTerm}"</p>
+                        <div className="border-t pt-4">
+                          <p className="text-sm text-gray-400 mb-3">
+                            Deseja criar um novo {cliente.tipo === 'pessoa_juridica' ? 'cliente pessoa' : 'cliente empresa'}?
+                          </p>
+                          <Button
+                            onClick={() => setShowCriarClienteModal(true)}
+                            variant="outline"
+                            size="sm"
+                            className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Criar Novo {cliente.tipo === 'pessoa_juridica' ? 'Cliente' : 'Empresa'}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      'Digite pelo menos 2 caracteres para buscar'
+                    )}
                   </div>
                 )}
               </div>
@@ -1165,6 +1267,101 @@ export function ClienteDetalhes({ cliente }: ClienteDetalhesProps) {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Criação de Cliente na Hora */}
+      {showCriarClienteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">
+              Criar Novo {cliente.tipo === 'pessoa_juridica' ? 'Cliente' : 'Empresa'}
+            </h3>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault()
+              const formData = new FormData(e.currentTarget)
+              handleCriarClienteEVincular(formData)
+            }} className="space-y-4" noValidate>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tipo *
+                </label>
+                <select 
+                  name="tipo" 
+                  className="w-full border rounded-md p-2" 
+                  required
+                  defaultValue={cliente.tipo === 'pessoa_juridica' ? 'pessoa_fisica' : 'pessoa_juridica'}
+                >
+                  {cliente.tipo === 'pessoa_juridica' ? (
+                    <option value="pessoa_fisica">Pessoa Física</option>
+                  ) : (
+                    <option value="pessoa_juridica">Pessoa Jurídica</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {cliente.tipo === 'pessoa_juridica' ? 'Nome Completo *' : 'Razão Social *'}
+                </label>
+                <Input
+                  name="nome"
+                  placeholder={cliente.tipo === 'pessoa_juridica' ? 'Nome completo' : 'Razão social da empresa'}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <Input
+                  name="email"
+                  type="text"
+                  placeholder="contato@empresa.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Telefone
+                </label>
+                <Input
+                  name="telefone"
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  onClick={() => setShowCriarClienteModal(false)}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={loading}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Criar e Vincular
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

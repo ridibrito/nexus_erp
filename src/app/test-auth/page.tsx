@@ -1,135 +1,114 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function TestAuthPage() {
-  const [email, setEmail] = useState('ricardo@coruss.com.br')
-  const [password, setPassword] = useState('123456')
-  const [result, setResult] = useState<any>(null)
+  const { user, session, loading } = useAuth()
+  const [testSession, setTestSession] = useState<any>(null)
+  const [testUser, setTestUser] = useState<any>(null)
 
-  const testLogin = async () => {
-    try {
-      console.log('🧪 Testando login...')
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+  useEffect(() => {
+    const testAuth = async () => {
+      try {
+        console.log('🧪 Testando autenticação...')
+        
+        // Testar getSession
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('📋 Session test:', session)
+        console.log('❌ Session error:', sessionError)
+        setTestSession(session)
 
-      console.log('📊 Resultado do teste:', { data, error })
-      setResult({ data, error })
-
-      if (data.session) {
-        console.log('✅ Sessão criada:', data.session)
+        // Testar getUser
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        console.log('👤 User test:', user)
+        console.log('❌ User error:', userError)
+        setTestUser(user)
+        
+      } catch (error) {
+        console.error('❌ Erro no teste:', error)
       }
-    } catch (error) {
-      console.error('❌ Erro no teste:', error)
-      setResult({ error })
     }
-  }
 
-  const testSession = async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      console.log('🔍 Sessão atual:', { session, error })
-      setResult({ session, error })
-    } catch (error) {
-      console.error('❌ Erro ao verificar sessão:', error)
-      setResult({ error })
-    }
-  }
-
-  const testSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      console.log('🚪 Logout:', { error })
-      setResult({ error })
-    } catch (error) {
-      console.error('❌ Erro no logout:', error)
-      setResult({ error })
-    }
-  }
-
-  const testSignUp = async () => {
-    try {
-      console.log('🧪 Testando registro...')
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: 'Usuário Teste'
-          }
-        }
-      })
-
-      console.log('📊 Resultado do registro:', { data, error })
-      setResult({ data, error })
-
-      if (data.user) {
-        console.log('✅ Usuário criado:', data.user)
-      }
-    } catch (error) {
-      console.error('❌ Erro no registro:', error)
-      setResult({ error })
-    }
-  }
+    testAuth()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Teste de Autenticação</h2>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-                     <div className="space-y-2">
-             <Button onClick={testSignUp} className="w-full">
-               Testar Registro
-             </Button>
-             <Button onClick={testLogin} variant="outline" className="w-full">
-               Testar Login
-             </Button>
-             <Button onClick={testSession} variant="outline" className="w-full">
-               Verificar Sessão
-             </Button>
-             <Button onClick={testSignOut} variant="destructive" className="w-full">
-               Logout
-             </Button>
-           </div>
-
-          {result && (
-            <div className="mt-4 p-4 bg-gray-100 rounded">
-              <h3 className="font-bold mb-2">Resultado:</h3>
-              <pre className="text-xs overflow-auto">
-                {JSON.stringify(result, null, 2)}
-              </pre>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold text-gray-900">Teste de Autenticação</h1>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Status do Contexto de Auth</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <strong>Loading:</strong> {loading ? 'Sim' : 'Não'}
+              </div>
+              <div>
+                <strong>User:</strong> {user ? user.email : 'Nenhum'}
+              </div>
+              <div>
+                <strong>Session:</strong> {session ? 'Ativa' : 'Nenhuma'}
+              </div>
+              <div>
+                <strong>User ID:</strong> {user?.id || 'N/A'}
+              </div>
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Teste Direto do Supabase</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <strong>Test Session:</strong> {testSession ? 'Ativa' : 'Nenhuma'}
+              </div>
+              <div>
+                <strong>Test User:</strong> {testUser ? testUser.email : 'Nenhum'}
+              </div>
+              <div>
+                <strong>Test User ID:</strong> {testUser?.id || 'N/A'}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ações</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-x-4">
+              <Button 
+                onClick={() => window.location.href = '/auth/login'}
+                variant="outline"
+              >
+                Ir para Login
+              </Button>
+              <Button 
+                onClick={() => window.location.href = '/'}
+                variant="outline"
+              >
+                Ir para Dashboard
+              </Button>
+              <Button 
+                onClick={() => window.location.reload()}
+                variant="outline"
+              >
+                Recarregar Página
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

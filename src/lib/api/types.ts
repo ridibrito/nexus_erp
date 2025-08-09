@@ -62,7 +62,8 @@ export interface Negocio {
   empresa_id: string
   cliente_id?: string
   pipeline_id: string
-  etapa_id: string
+  etapa_id?: string
+  responsavel_id?: string
   titulo: string
   descricao?: string
   valor?: number

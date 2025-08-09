@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next') || '/dashboard'
   const { signIn } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,14 +26,21 @@ export default function LoginPage() {
 
     try {
       console.log('🔐 Tentando fazer login...')
+      console.log('📧 Email:', email)
+      console.log('🎯 Próxima rota:', next)
+      
       const result = await signIn(email, password)
       
       console.log('📊 Resultado do login:', result)
       
       if (result.success) {
         console.log('✅ Login bem-sucedido, redirecionando...')
-        // Usar router para redirecionamento
-        router.push('/')
+        // Aguardar um pouco para garantir que a sessão foi processada
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Usar router.replace para disparar o middleware com cookies novos
+        console.log('🔄 Redirecionando com router.replace...')
+        router.replace(next)
       } else {
         console.log('❌ Erro no login:', result.error)
         // O erro já foi mostrado pelo toast no contexto

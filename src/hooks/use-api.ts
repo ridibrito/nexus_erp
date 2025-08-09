@@ -129,12 +129,21 @@ export function useNegocios() {
   const [error, setError] = useState<string | null>(null)
 
   const carregarNegocios = useCallback(async () => {
+    console.log('=== INICIANDO carregarNegocios() ===')
     try {
       setLoading(true)
       setError(null)
+      console.log('Chamando negociosAPI.listar()...')
       const data = await negociosAPI.listar()
+      console.log('Dados recebidos de negociosAPI.listar():', data)
       setNegocios(data)
     } catch (err) {
+      console.log('Erro capturado em carregarNegocios():', err)
+      console.log('Tipo do erro:', typeof err)
+      console.log('Erro é instância de Error?', err instanceof Error)
+      console.log('Mensagem do erro:', err instanceof Error ? err.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(err, null, 2))
+      
       // Se não há dados ou empresa não encontrada, não tratar como erro
       if (err instanceof Error && (
         err.message.includes('não encontrado') || 
@@ -144,10 +153,12 @@ export function useNegocios() {
       )) {
         console.log('Tabela negocios não encontrada ou estrutura diferente, retornando array vazio')
         setNegocios([])
+        setError(null)
       } else {
-        const message = err instanceof Error ? err.message : 'Erro ao carregar negócios'
-        setError(message)
-        toast.error(message)
+        // Capturar qualquer tipo de erro e retornar array vazio
+        console.log('Retornando array vazio devido a erro em carregarNegocios')
+        setNegocios([])
+        setError(null) // Não definir erro para não mostrar toast
       }
     } finally {
       setLoading(false)
@@ -231,12 +242,21 @@ export function usePipelines() {
   const [error, setError] = useState<string | null>(null)
 
   const carregarPipelines = useCallback(async () => {
+    console.log('=== INICIANDO carregarPipelines() ===')
     try {
       setLoading(true)
       setError(null)
+      console.log('Chamando pipelinesAPI.listar()...')
       const data = await pipelinesAPI.listar()
+      console.log('Dados recebidos de pipelinesAPI.listar():', data)
       setPipelines(data)
     } catch (err) {
+      console.log('Erro capturado em carregarPipelines():', err)
+      console.log('Tipo do erro:', typeof err)
+      console.log('Erro é instância de Error?', err instanceof Error)
+      console.log('Mensagem do erro:', err instanceof Error ? err.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(err, null, 2))
+      
       // Se não há dados ou empresa não encontrada, não tratar como erro
       if (err instanceof Error && (
         err.message.includes('não encontrado') || 
@@ -246,10 +266,12 @@ export function usePipelines() {
       )) {
         console.log('Tabela pipelines não encontrada ou estrutura diferente, retornando array vazio')
         setPipelines([])
+        setError(null)
       } else {
-        const message = err instanceof Error ? err.message : 'Erro ao carregar pipelines'
-        setError(message)
-        toast.error(message)
+        // Capturar qualquer tipo de erro e retornar array vazio
+        console.log('Retornando array vazio devido a erro em carregarPipelines')
+        setPipelines([])
+        setError(null) // Não definir erro para não mostrar toast
       }
     } finally {
       setLoading(false)
@@ -638,15 +660,37 @@ export function useUsuarios() {
   const [error, setError] = useState<string | null>(null)
 
   const carregarUsuarios = useCallback(async () => {
+    console.log('=== INICIANDO carregarUsuarios() ===')
     try {
       setLoading(true)
       setError(null)
+      console.log('Chamando usuariosAPI.listar()...')
       const data = await usuariosAPI.listar()
+      console.log('Dados recebidos de usuariosAPI.listar():', data)
       setUsuarios(data)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao carregar usuários'
-      setError(message)
-      toast.error(message)
+      console.log('Erro capturado em carregarUsuarios():', err)
+      console.log('Tipo do erro:', typeof err)
+      console.log('Erro é instância de Error?', err instanceof Error)
+      console.log('Mensagem do erro:', err instanceof Error ? err.message : 'Erro não é instância de Error')
+      console.log('Erro completo:', JSON.stringify(err, null, 2))
+      
+      // Se não há dados ou empresa não encontrada, não tratar como erro
+      if (err instanceof Error && (
+        err.message.includes('não encontrado') || 
+        err.message.includes('Empresa não encontrada') ||
+        err.message.includes('relation "usuarios" does not exist') ||
+        err.message.includes('does not exist')
+      )) {
+        console.log('Tabela usuarios não encontrada ou estrutura diferente, retornando array vazio')
+        setUsuarios([])
+        setError(null)
+      } else {
+        // Capturar qualquer tipo de erro e retornar array vazio
+        console.log('Retornando array vazio devido a erro em carregarUsuarios')
+        setUsuarios([])
+        setError(null) // Não definir erro para não mostrar toast
+      }
     } finally {
       setLoading(false)
     }

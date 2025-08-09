@@ -21,6 +21,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { useNegocios, usePipelines, useClientes } from '@/hooks/use-api'
+import { useAuth } from '@/contexts/auth-context'
 import { pipelinesAPI } from '@/lib/api'
 import { PipelineEtapa } from '@/lib/api'
 import { NovoNegocioModal } from '@/components/modals/novo-negocio-modal'
@@ -37,6 +38,7 @@ export default function NegociosPage() {
 
 function NegociosContent() {
   const router = useRouter()
+  const { user } = useAuth()
   const { negocios, loading: loadingNegocios, error: errorNegocios, moverNegocio, criarNegocio } = useNegocios()
   const { pipelines, loading: loadingPipelines, error: errorPipelines } = usePipelines()
   const { clientes, loading: loadingClientes } = useClientes()
@@ -44,10 +46,18 @@ function NegociosContent() {
   const [pipelineAtivo, setPipelineAtivo] = useState<string>('')
   const [etapasPipeline, setEtapasPipeline] = useState<PipelineEtapa[]>([])
   const [showNovoNegocioModal, setShowNovoNegocioModal] = useState(false)
+  const [selectedEtapaForModal, setSelectedEtapaForModal] = useState<string>('')
   const [dragItem, setDragItem] = useState<Negocio | null>(null)
   const [showPipelineDropdown, setShowPipelineDropdown] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+
+  // Selecionar primeiro pipeline se não há nenhum selecionado
+  useEffect(() => {
+    if (pipelines.length > 0 && !pipelineAtivo) {
+      setPipelineAtivo(pipelines[0].id)
+    }
+  }, [pipelines, pipelineAtivo])
 
   // Selecionar primeiro pipeline se não há nenhum selecionado
   useEffect(() => {
@@ -75,7 +85,8 @@ function NegociosContent() {
     }
   }
 
-  const handleOpenNovoNegocioModal = () => {
+  const handleOpenNovoNegocioModal = (etapaId?: string) => {
+    setSelectedEtapaForModal(etapaId || '')
     setShowNovoNegocioModal(true)
   }
 
@@ -131,6 +142,7 @@ function NegociosContent() {
     if (!cliente) return 'Cliente não encontrado'
     
     if (cliente.tipo === 'pessoa_juridica') {
+      // Priorizar nome fantasia sobre razão social para PJ
       return cliente.nome_fant || cliente.razao_social || 'Empresa sem nome'
     } else {
       return cliente.nome || 'Pessoa sem nome'
@@ -148,16 +160,26 @@ function NegociosContent() {
     )
   }
 
-  // Se há erros reais (não relacionados a dados vazios), mostrar erro
-  if ((errorNegocios && !errorNegocios.includes('não encontrado') && !errorNegocios.includes('Empresa não encontrada')) ||
-      (errorPipelines && !errorPipelines.includes('não encontrado') && !errorPipelines.includes('Empresa não encontrada'))) {
+  // Mostrar erros de debug
+  if (errorNegocios || errorPipelines) {
     return (
       <div className="h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Erro ao carregar dados</h2>
-          <p className="text-gray-600">Tente recarregar a página</p>
-
+          <p className="text-gray-600 mb-4">Tente recarregar a página</p>
+          
+          {errorNegocios && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-2">
+              <p className="text-sm text-red-700"><strong>Erro Negócios:</strong> {errorNegocios}</p>
+            </div>
+          )}
+          
+          {errorPipelines && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-sm text-red-700"><strong>Erro Pipelines:</strong> {errorPipelines}</p>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -266,7 +288,7 @@ function NegociosContent() {
                 Configurar
                 <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
-              <Button size="sm" onClick={handleOpenNovoNegocioModal}>
+              <Button size="sm" onClick={() => handleOpenNovoNegocioModal()}>
                 <Plus className="h-4 w-4 mr-2" />
                 Novo Negócio
               </Button>
@@ -381,7 +403,7 @@ function NegociosContent() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={handleOpenNovoNegocioModal}
+                        onClick={() => handleOpenNovoNegocioModal(etapa.id)}
                         className="text-xs"
                       >
                         <Plus className="h-3 w-3 mr-1" />
@@ -401,7 +423,11 @@ function NegociosContent() {
         open={showNovoNegocioModal}
         onOpenChange={setShowNovoNegocioModal}
         onSubmit={handleCriarNegocio}
+        selectedPipeline={pipelineAtivo}
+        selectedEtapa={selectedEtapaForModal}
+        currentUser={user ? { id: user.id, nome: user.user_metadata?.name || user.email || 'Usuário' } : undefined}
       />
     </div>
   )
+
 }

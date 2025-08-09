@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import { Negocio } from './types'
+import { getCurrentEmpresa } from './utils'
 
 export const negociosAPI = {
   // Listar negócios (RLS fará o isolamento)
@@ -55,11 +56,17 @@ export const negociosAPI = {
     return data
   },
 
-  // Criar negócio (RLS garantirá empresa_id correto)
+  // Criar negócio
   async criar(negocio: Omit<Negocio, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>): Promise<Negocio> {
+    const empresa_id = await getCurrentEmpresa()
+    if (!empresa_id) throw new Error('Empresa não encontrada')
+
     const { data, error } = await supabase
       .from('negocios')
-      .insert(negocio)
+      .insert({
+        ...negocio,
+        empresa_id
+      })
       .select()
       .single()
 

@@ -79,15 +79,14 @@ export function NovoClienteModal({ isOpen, onClose }: NovoClienteModalProps) {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="nome">Nome/Razão Social</Label>
+                <Label htmlFor="nome">Nome/Nome Fantasia</Label>
                 <Input
                   id="nome"
                   value={formData.nome}
                   onChange={(e) => handleInputChange('nome', e.target.value)}
-                  placeholder="Nome completo ou razão social"
+                  placeholder="Nome completo ou nome fantasia"
                   className="mt-1"
                   disabled={isLoading}
-                  required
                 />
               </div>
 
@@ -101,7 +100,6 @@ export function NovoClienteModal({ isOpen, onClose }: NovoClienteModalProps) {
                   placeholder="email@exemplo.com"
                   className="mt-1"
                   disabled={isLoading}
-                  required
                 />
               </div>
 

@@ -2,8 +2,14 @@
 
 import { useState, useRef } from 'react'
 import { Button } from './button'
-import { Upload, X, User } from 'lucide-react'
+import { Upload, X, User, MoreHorizontal, Camera, Link } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './dropdown-menu'
 
 interface AvatarUploadProps {
   currentAvatar?: string
@@ -95,50 +101,58 @@ export function AvatarUpload({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Avatar atual */}
-      <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white font-bold relative group`}>
-        {currentAvatar ? (
-          <img 
-            src={currentAvatar} 
-            alt="Avatar" 
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'}`} />
-        )}
-        
-        {/* Overlay com opções */}
-        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="flex space-x-1">
-            <Button
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="h-6 w-6 p-0 bg-white text-gray-800 hover:bg-gray-100"
-            >
-              <Upload className="h-3 w-3" />
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowUrlInput(true)}
-              disabled={isUploading}
-              className="h-6 w-6 p-0 bg-white text-gray-800 hover:bg-gray-100"
-            >
-              <User className="h-3 w-3" />
-            </Button>
-            {currentAvatar && (
-              <Button
-                size="sm"
-                onClick={handleRemoveAvatar}
-                disabled={isUploading}
-                className="h-6 w-6 p-0 bg-red-500 text-white hover:bg-red-600"
-              >
-                <X className="h-3 w-3" />
-              </Button>
+      {/* Avatar com dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-white border border-gray-200 flex items-center justify-center text-gray-600 font-bold relative cursor-pointer hover:border-gray-300 transition-colors group`}>
+            {currentAvatar ? (
+              <img 
+                src={currentAvatar} 
+                alt="Avatar" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className={`${size === 'sm' ? 'h-4 w-4' : size === 'md' ? 'h-6 w-6' : 'h-8 w-8'}`} />
             )}
+            
+            {/* Indicador de que é clicável */}
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity flex items-center justify-center">
+              <MoreHorizontal className={`${size === 'sm' ? 'h-3 w-3' : size === 'md' ? 'h-4 w-4' : 'h-5 w-5'} text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity`} />
+            </div>
           </div>
-        </div>
-      </div>
+        </DropdownMenuTrigger>
+        
+        <DropdownMenuContent align="center" className="w-48">
+          <DropdownMenuItem 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="cursor-pointer"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Upload de arquivo
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem 
+            onClick={() => setShowUrlInput(true)}
+            disabled={isUploading}
+            className="cursor-pointer"
+          >
+            <Link className="h-4 w-4 mr-2" />
+            Adicionar por URL
+          </DropdownMenuItem>
+          
+          {currentAvatar && (
+            <DropdownMenuItem 
+              onClick={handleRemoveAvatar}
+              disabled={isUploading}
+              className="cursor-pointer text-red-600 focus:text-red-600"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Remover avatar
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Input de arquivo oculto */}
       <input

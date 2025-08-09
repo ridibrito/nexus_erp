@@ -87,7 +87,7 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center space-x-3 hover:bg-gray-50">
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex items-center justify-center">
                 {getUserAvatar() ? (
                   <img
                     src={getUserAvatar()}
@@ -95,7 +95,7 @@ export function Header() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User className="h-4 w-4 text-white" />
+                  <User className="h-4 w-4 text-gray-400" />
                 )}
               </div>
               <div className="text-left">

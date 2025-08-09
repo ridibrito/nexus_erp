@@ -68,6 +68,7 @@ export function ClienteDetalhesClient({ cliente }: ClienteDetalhesClientProps) {
 
   const getClienteNome = (cliente: Cliente) => {
     if (cliente.tipo === 'pessoa_juridica') {
+      // Priorizar nome fantasia sobre razão social para PJ
       return cliente.nome_fant || cliente.razao_social || 'Empresa sem nome'
     } else {
       return cliente.nome || 'Pessoa sem nome'
@@ -159,10 +160,10 @@ export function ClienteDetalhesClient({ cliente }: ClienteDetalhesClientProps) {
                     <label className="text-xs font-medium text-gray-500">Nome</label>
                     <p className="text-sm text-gray-900">{getClienteNome(cliente)}</p>
                   </div>
-                  {cliente.tipo === 'pessoa_juridica' && cliente.razao_social && (
+                  {cliente.tipo === 'pessoa_juridica' && (
                     <div>
                       <label className="text-xs font-medium text-gray-500">Razão Social</label>
-                      <p className="text-sm text-gray-900">{cliente.razao_social}</p>
+                      <p className="text-sm text-gray-900">{cliente.razao_social || 'Não informado'}</p>
                     </div>
                   )}
                   <div>
@@ -401,8 +402,8 @@ export function ClienteDetalhesClient({ cliente }: ClienteDetalhesClientProps) {
 
                           {/* Item do histórico - E-mail */}
                           <div className="flex items-start gap-3 p-4 border rounded-lg">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <Mail className="h-4 w-4 text-blue-600" />
+                            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-gray-200">
+                              <Mail className="h-4 w-4 text-gray-600" />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
